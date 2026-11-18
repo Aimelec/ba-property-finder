@@ -1,4 +1,4 @@
-"""Página Inicio: resumen y mejores opciones."""
+"""Home page: summary numbers and the best options."""
 from datetime import date
 
 from PySide6.QtCore import Qt, Signal
@@ -8,11 +8,13 @@ from qfluentwidgets import (BodyLabel, CaptionLabel, CardWidget, FlowLayout, Smo
                             StrongBodyLabel, SubtitleLabel, TitleLabel)
 
 from ..domain import geo
+from ..i18n import tr
+from .labels import tipo_label
 from .common import ACCENT, StatCard, TEXT_DIM, dim_label, fade_in, meters, score_color, usd
 
 
 class ListingCard(CardWidget):
-    """Fila clickeable con un aviso."""
+    """Clickable row with one listing."""
     opened = Signal(str)
 
     def __init__(self, r, parent=None):
@@ -29,15 +31,15 @@ class ListingCard(CardWidget):
         mid.setSpacing(0)
         star = "★ " if r.get("favorite") else ""
         mid.addWidget(StrongBodyLabel(f"{star}{r['address']}", self))
-        bits = [r["tipo"], r["zona"]]
+        bits = [tipo_label(r["tipo"]), r["zona"]]
         if r["amb"]:
-            bits.append(f"{r['amb']:.0f} amb.")
+            bits.append(tr("{n} rooms", n=f"{r['amb']:.0f}"))
         m2 = r["m2_cub"] or r["m2_tot"]
         if m2:
             bits.append(f"{m2:.0f} m²")
         if r["station_m"] is not None:
-            bits.append(f"estación {r['station']} {meters(r['station_m'])} "
-                        f"(~{geo.walk_minutes(r['station_m'])} min)")
+            bits.append(tr("{station} station {distance} (~{minutes} min)", station=r["station"],
+                           distance=meters(r["station_m"]), minutes=geo.walk_minutes(r["station_m"])))
         cap = CaptionLabel(" · ".join(bits), self)
         cap.setTextColor(QColor(TEXT_DIM), QColor(TEXT_DIM))
         mid.addWidget(cap)
@@ -61,26 +63,26 @@ class HomePage(SmoothScrollArea):
         self.lay.setContentsMargins(24, 16, 24, 24)
         self.lay.setSpacing(12)
         self.lay.addWidget(TitleLabel("depa", body))
-        self.lay.addWidget(dim_label(
-            "Avisos de venta de portales e inmobiliarias con puntaje según tus preferencias. Lo más "
-            "importante por defecto: cercanía a una estación de tren y zona norte.", body))
+        self.lay.addWidget(dim_label(tr(
+            "Properties for sale from portals and agencies, scored by your preferences. By default what "
+            "matters most is being close to a train station and the northern suburbs."), body))
 
         stats_w = QWidget(body)
         self.flow = FlowLayout(stats_w, needAni=True)
         self.flow.setHorizontalSpacing(12)
         self.cards = {}
-        for k, t in [("total", "Avisos guardados"), ("ubicados", "Con ubicación"),
-                     ("filtrados", "Pasan tus filtros"), ("nuevos", "Nuevos hoy"),
-                     ("bajas", "Bajaron de precio"), ("cerca", "A ≤ 600 m de estación")]:
+        for k, t in [("total", "Saved listings"), ("ubicados", "Located"),
+                     ("filtrados", "Match your filters"), ("nuevos", "New today"),
+                     ("bajas", "Price dropped"), ("cerca", "≤ 600 m from a station")]:
             self.cards[k] = StatCard(t, stats_w)
             self.flow.addWidget(self.cards[k])
         self.lay.addWidget(stats_w)
 
-        self.lay.addWidget(SubtitleLabel("Mejores según tus preferencias", body))
+        self.lay.addWidget(SubtitleLabel(tr("Best for your preferences"), body))
         self.top_box = QVBoxLayout()
         self.top_box.setSpacing(6)
         self.lay.addLayout(self.top_box)
-        self.lay.addWidget(SubtitleLabel("Bajaron de precio", body))
+        self.lay.addWidget(SubtitleLabel(tr("Price dropped"), body))
         self.drop_box = QVBoxLayout()
         self.drop_box.setSpacing(6)
         self.lay.addLayout(self.drop_box)
@@ -113,6 +115,6 @@ class HomePage(SmoothScrollArea):
         self.cards["bajas"].set(sum(1 for r in rows if r["bajo_precio"]))
         self.cards["cerca"].set(sum(1 for r in filt if r["station_m"] is not None and r["station_m"] <= 600))
         self._fill(self.top_box, filt[:10],
-                   "Todavía no hay avisos. Andá a Buscar para descargar los primeros.")
+                   tr("No listings yet. Go to Search to download the first ones."))
         self._fill(self.drop_box, [r for r in filt if r["bajo_precio"]][:10],
-                   "Ninguno por ahora (se detecta al volver a buscar otro día).")
+                   tr("None for now (detected when you search again on another day)."))

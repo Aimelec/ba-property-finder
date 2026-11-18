@@ -1,4 +1,4 @@
-"""Página Propiedades: filtros | tabla | ficha."""
+"""Listings page: filters | table | detail panel."""
 from PySide6.QtCore import (QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt, QUrl)
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, QPixmap
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest
@@ -9,33 +9,35 @@ from qfluentwidgets import (BodyLabel, CaptionLabel, FluentIcon as FIF, ImageLab
                             TogglePushButton)
 
 from ..domain import geo
+from ..i18n import tr
 from .common import ACCENT, TEXT_DIM, dim_label, fade_in, meters, miles, score_color, usd
+from .labels import group_label, tipo_label
 from .filters import FilterPanel
 
-# título, función valor mostrado, función valor para ordenar
+# title, shown value, value used for sorting
 COLUMNS = [
-    ("Puntaje", lambda r: r["score"], lambda r: r["score"]),
-    ("Sitio", lambda r: SITE_SHORT[r["id"][:2]] + (f" +{len(r['otros'])}" if r["otros"] else ""),
+    ("Score", lambda r: r["score"], lambda r: r["score"]),
+    ("Site", lambda r: SITE_SHORT[r["id"][:2]] + (f" +{len(r['otros'])}" if r["otros"] else ""),
      lambda r: r["id"][:2]),
-    ("Tipo", lambda r: "Depto" if r["tipo"] == "Departamento" else r["tipo"], lambda r: r["tipo"]),
-    ("Zona", lambda r: r["zona"], lambda r: r["zona"] or ""),
-    ("Dirección", lambda r: r["address"], lambda r: r["address"] or ""),
-    ("Precio", lambda r: usd(r["price_usd"]), lambda r: r["price_usd"] or 1e12),
+    ("Type", lambda r: tr("Apt.") if r["tipo"] == "Departamento" else tipo_label(r["tipo"]), lambda r: r["tipo"]),
+    ("Zone", lambda r: r["zona"], lambda r: r["zona"] or ""),
+    ("Address", lambda r: r["address"], lambda r: r["address"] or ""),
+    ("Price", lambda r: usd(r["price_usd"]), lambda r: r["price_usd"] or 1e12),
     ("USD/m²", lambda r: miles(r["ppm2"]), lambda r: r["ppm2"] or 1e12),
-    ("vs zona", lambda r: "—" if r["vs_zona"] is None else f"{r['vs_zona']:+d} %",
+    ("vs zone", lambda r: "—" if r["vs_zona"] is None else f"{r['vs_zona']:+d} %",
      lambda r: r["vs_zona"] if r["vs_zona"] is not None else 1e9),
     ("m²", lambda r: miles(r["m2_cub"] or r["m2_tot"]), lambda r: r["m2_cub"] or r["m2_tot"] or 0),
-    ("Amb.", lambda r: miles(r["amb"]), lambda r: r["amb"] or 0),
-    ("Estación", lambda r: r["station"] or "sin ubicación", lambda r: r["station"] or "~"),
-    ("Distancia", lambda r: meters(r["station_m"]), lambda r: r["station_m"] if r["station_m"] is not None else 1e9),
-    ("Expensas", lambda r: miles(r["expensas"], "$ "), lambda r: r["expensas"] or 0),
-    ("Antig.", lambda r: "—" if r["antig"] is None else f"{r['antig']:.0f} años", lambda r: r["antig"] if r["antig"] is not None else 999),
+    ("Rooms", lambda r: miles(r["amb"]), lambda r: r["amb"] or 0),
+    ("Station", lambda r: r["station"] or tr("not located"), lambda r: r["station"] or "~"),
+    ("Distance", lambda r: meters(r["station_m"]), lambda r: r["station_m"] if r["station_m"] is not None else 1e9),
+    ("Fees", lambda r: miles(r["expensas"], "$ "), lambda r: r["expensas"] or 0),
+    ("Age", lambda r: "—" if r["antig"] is None else tr("{n} yrs", n=f"{r['antig']:.0f}"), lambda r: r["antig"] if r["antig"] is not None else 999),
 ]
-SITE_SHORT = {"ap": "Argenprop", "zp": "Zonaprop", "ml": "MeLi", "tk": "Inmob."}
+SITE_SHORT = {"ap": "Argenprop", "zp": "Zonaprop", "ml": "MeLi", "tk": "Agency"}
 NUMERIC = {0, 5, 6, 7, 8, 9, 11, 12, 13}
-CRIT_NAMES = {"estacion": "Cerca de estación", "precio_m2": "Precio por m²", "zona": "Zona",
-              "superficie": "Superficie", "expensas": "Expensas", "antiguedad": "Antigüedad",
-              "extras": "Cochera / exterior / crédito"}
+CRIT_NAMES = {"estacion": "Close to a station", "precio_m2": "Price per m²", "zona": "Zone",
+              "superficie": "Area", "expensas": "Monthly fees", "antiguedad": "Age",
+              "extras": "Parking / outdoor / mortgage"}
 
 
 class Model(QAbstractTableModel):
@@ -56,7 +58,7 @@ class Model(QAbstractTableModel):
 
     def headerData(self, section, orient, role=Qt.DisplayRole):
         if orient == Qt.Horizontal and role == Qt.DisplayRole:
-            return COLUMNS[section][0]
+            return tr(COLUMNS[section][0])
         return None
 
     def data(self, idx, role=Qt.DisplayRole):
@@ -87,7 +89,7 @@ class Model(QAbstractTableModel):
         if role == Qt.ToolTipRole and c == 4:
             return r["title"]
         if role == Qt.ToolTipRole and c == 1 and r["otros"]:
-            return "También en: " + ", ".join(f"{s} ({usd(p)})" for s, _, p in r["otros"])
+            return tr("Also on: ") + ", ".join(f"{tr(s)} ({usd(p)})" for s, _, p in r["otros"])
         return None
 
 
@@ -108,7 +110,7 @@ class DetailPanel(SmoothScrollArea):
         self.photo = ImageLabel(self.body)
         self.photo.setBorderRadius(10, 10, 10, 10)
         self.photo.setFixedHeight(220)
-        self.price = TitleLabel("Elegí una propiedad", self.body)
+        self.price = TitleLabel(tr("Pick a property"), self.body)
         self.title = StrongBodyLabel("", self.body)
         self.title.setWordWrap(True)
         self.addr = dim_label("", self.body)
@@ -122,22 +124,22 @@ class DetailPanel(SmoothScrollArea):
         self.station.setWordWrap(True)
 
         btns = QHBoxLayout()
-        self.open_btn = PrimaryPushButton(FIF.LINK, "Ver aviso", self.body)
+        self.open_btn = PrimaryPushButton(FIF.LINK, tr("Open listing"), self.body)
         self.open_btn.clicked.connect(lambda: self.r and QDesktopServices.openUrl(QUrl(self.r["url"])))
-        self.map_btn = PushButton(FIF.GLOBE, "Mapa", self.body)
+        self.map_btn = PushButton(FIF.GLOBE, tr("Map"), self.body)
         self.map_btn.clicked.connect(lambda: self.r and self.state.map_focus_request.emit(self.r["id"]))
         btns.addWidget(self.open_btn)
         btns.addWidget(self.map_btn)
         btns2 = QHBoxLayout()
-        self.fav = TogglePushButton(FIF.HEART, "Favorito", self.body)
+        self.fav = TogglePushButton(FIF.HEART, tr("Favourite"), self.body)
         self.fav.clicked.connect(self._fav)
-        self.disc = TogglePushButton(FIF.DELETE, "Descartar", self.body)
+        self.disc = TogglePushButton(FIF.DELETE, tr("Discard"), self.body)
         self.disc.clicked.connect(self._disc)
         btns2.addWidget(self.fav)
         btns2.addWidget(self.disc)
 
         self.notes = LineEdit(self.body)
-        self.notes.setPlaceholderText("Notas propias (se guardan solas)")
+        self.notes.setPlaceholderText(tr("Your notes (saved automatically)"))
         self.notes.editingFinished.connect(self._notes)
 
         self.score_lbl = SubtitleLabel("", self.body)
@@ -167,9 +169,9 @@ class DetailPanel(SmoothScrollArea):
         lay.addLayout(crit_box)
         lay.addSpacing(6)
         lay.addWidget(self.history)
-        lay.addWidget(StrongBodyLabel("Características", self.body))
+        lay.addWidget(StrongBodyLabel(tr("Features"), self.body))
         lay.addWidget(self.features)
-        lay.addWidget(StrongBodyLabel("Descripción", self.body))
+        lay.addWidget(StrongBodyLabel(tr("Description"), self.body))
         lay.addWidget(self.desc)
         lay.addStretch(1)
         self.setWidget(self.body)
@@ -187,59 +189,61 @@ class DetailPanel(SmoothScrollArea):
             return
         self.price.setText(usd(r["price_usd"]) if r["price_usd"] else miles(r["price_ars"], "$ "))
         self.title.setText(r["title"] or "")
-        self.addr.setText(f"{r['address']} · {r['zona']} ({r['grupo']}) · {SITE_SHORT[r['id'][:2]]}")
-        self.also.setText("También en: " + " · ".join(
-            f'<a style="color:{ACCENT}" href="{u}">{s} {usd(p)}</a>' for s, u, p in r["otros"])
+        self.addr.setText(f"{r['address']} · {r['zona']} ({group_label(r['grupo'])}) · {tr(SITE_SHORT[r['id'][:2]])}")
+        self.also.setText(tr("Also on: ") + " · ".join(
+            f'<a style="color:{ACCENT}" href="{u}">{tr(s)} {usd(p)}</a>' for s, u, p in r["otros"])
             if r["otros"] else "")
         self.also.setVisible(bool(r["otros"]))
-        bits = [r["tipo"]]
+        bits = [tipo_label(r["tipo"])]
         if r["amb"]:
-            bits.append(f"{r['amb']:.0f} amb.")
+            bits.append(tr("{n} rooms", n=f"{r['amb']:.0f}"))
         if r["dorm"]:
-            bits.append(f"{r['dorm']:.0f} dorm.")
+            bits.append(tr("{n} bedr.", n=f"{r['dorm']:.0f}"))
         if r["banos"]:
-            bits.append(f"{r['banos']:.0f} baño(s)")
+            bits.append(tr("{n} bath(s)", n=f"{r['banos']:.0f}"))
         if r["m2_cub"]:
-            bits.append(f"{r['m2_cub']:.0f} m² cub.")
+            bits.append(tr("{n} m² covered", n=f"{r['m2_cub']:.0f}"))
         if r["m2_tot"] and r["m2_tot"] != r["m2_cub"]:
-            bits.append(f"{r['m2_tot']:.0f} m² tot.")
+            bits.append(tr("{n} m² total", n=f"{r['m2_tot']:.0f}"))
         if r["ppm2"]:
-            vs = "" if r["vs_zona"] is None else f" ({r['vs_zona']:+d} % vs zona)"
+            vs = "" if r["vs_zona"] is None else tr(" ({pct:+d} % vs zone)", pct=r["vs_zona"])
             bits.append(f"USD {miles(r['ppm2'])}/m²{vs}")
         if r["expensas"]:
-            bits.append(f"expensas {miles(r['expensas'], '$ ')}")
+            bits.append(tr("fees {amount}", amount=miles(r["expensas"], "$ ")))
         if r["antig"] is not None:
-            bits.append("a estrenar" if r["antig"] == 0 else f"{r['antig']:.0f} años")
+            bits.append(tr("brand new") if r["antig"] == 0 else tr("{n} years old", n=f"{r['antig']:.0f}"))
         self.facts.setText(" · ".join(bits))
         if r["station_m"] is not None:
             line = f" ({r['station_line']})" if r["station_line"] else ""
-            approx = " (ubicación aproximada por dirección)" if r.get("geo_src") == "direccion" else ""
-            self.station.setText(f"Estación {r['station']}{line}: {meters(r['station_m'])} en línea recta, "
-                                 f"~{geo.walk_minutes(r['station_m'])} min caminando{approx}")
+            approx = tr(" (approximate location from the address)") if r.get("geo_src") == "direccion" else ""
+            self.station.setText(tr("{station} station{line}: {distance} in a straight line, ~{minutes} min walk",
+                                    station=r["station"], line=line, distance=meters(r["station_m"]),
+                                    minutes=geo.walk_minutes(r["station_m"])) + approx)
             if r.get("subte_m") is not None and r["subte_m"] <= 2000:
-                self.station.setText(self.station.text() + f"\nSubte {r['subte_line']} {r['subte']}: "
-                                     f"{meters(r['subte_m'])} (~{geo.walk_minutes(r['subte_m'])} min)")
+                self.station.setText(self.station.text() + "\n" + tr(
+                    "Subte {line} {station}: {distance} (~{minutes} min)", line=r["subte_line"], station=r["subte"],
+                    distance=meters(r["subte_m"]), minutes=geo.walk_minutes(r["subte_m"])))
         else:
-            self.station.setText("Estación: sin ubicación (no se encontró la dirección; se completa al leer la ficha).")
+            self.station.setText(tr("Station: not located (the address was not found; filled in when the detail page is read)."))
         self.fav.setChecked(bool(r.get("favorite")))
         self.disc.setChecked(bool(r.get("discarded")))
         self.notes.setText(r.get("notes") or "")
 
-        self.score_lbl.setText(f"Puntaje {r['score']}/100")
+        self.score_lbl.setText(tr("Score {score}/100", score=r["score"]))
         self.score_lbl.setTextColor(score_color(r["score"]), score_color(r["score"]))
         for k, (cap, bar) in self.bars.items():
             v = round(100 * r["criterios"].get(k, 0))
             w = self.state.settings["pesos"].get(k, 0)
-            cap.setText(f"{CRIT_NAMES[k]} · {v}/100 · peso {w}")
+            cap.setText(tr("{criterion} · {value}/100 · weight {weight}", criterion=tr(CRIT_NAMES[k]), value=v, weight=w))
             bar.setValue(v)
 
         h = r.get("history", [])
         hist = " → ".join(f"{d[5:]}: {usd(p)}" for d, p in h[-6:]) if len(h) > 1 else ""
-        self.history.setText(("Historial de precio: " + hist) if hist else
-                             f"Visto por primera vez: {(r['first_seen'] or '')[:10]}")
+        self.history.setText((tr("Price history: ") + hist) if hist else
+                             tr("First seen: {date}", date=(r["first_seen"] or "")[:10]))
         feats = [k if v is True else f"{k}: {v}" for k, v in r["features"].items()
                  if k not in ("Tipo de operación", "Precio")]
-        self.features.setText(" · ".join(feats) if feats else "Se completan al leer la ficha.")
+        self.features.setText(" · ".join(feats) if feats else tr("Filled in when the detail page is read."))
         self.desc.setText(r["description"] or "")
 
         self.photo.setFixedHeight(220)
@@ -289,7 +293,7 @@ class ListingsPage(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 16, 12, 12)
         head = QHBoxLayout()
-        head.addWidget(TitleLabel("Propiedades", self))
+        head.addWidget(TitleLabel(tr("Listings"), self))
         self.count = dim_label("", self)
         head.addSpacing(16)
         head.addWidget(self.count, 1)
@@ -333,7 +337,7 @@ class ListingsPage(QWidget):
         self.model.set_rows(rows)
         total = len(self.state.rows)
         located = sum(1 for r in rows if r["lat"] is not None)
-        self.count.setText(f"{len(rows)} de {total} avisos · {located} con ubicación")
+        self.count.setText(tr("{shown} of {total} listings · {located} located", shown=len(rows), total=total, located=located))
         if keep:
             self.select(keep, scroll=False)
 

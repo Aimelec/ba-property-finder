@@ -1,4 +1,4 @@
-"""Página Mapa: Leaflet (tiles oscuros de CARTO) dentro de Qt WebEngine."""
+"""Map page: Leaflet (dark Esri tiles) inside Qt WebEngine. The page's texts come from tr() as a JS object T."""
 import json
 from urllib.parse import unquote
 
@@ -11,6 +11,9 @@ from qfluentwidgets import TitleLabel
 
 from ..opendata import safety as seguridad, stations
 from ..domain import geo
+from ..domain.duplicates import source_name
+from ..i18n import tr
+from .labels import tipo_label
 from .common import BG, dim_label, meters, miles, score_color
 from .filters import FilterPanel
 
@@ -33,6 +36,7 @@ html,body,#map{height:100%;margin:0;background:__BG__;font-family:'Segoe UI',san
 .leaflet-control-layers{background:#1e2128;color:#e6e6e6;border:none!important}
 .leaflet-bar a{background:#1e2128;color:#e6e6e6;border-color:#333}
 </style></head><body><div id="map"></div><script>
+const T=__T__;
 const map=L.map('map',{preferCanvas:true,zoomControl:true,maxZoom:16}).setView([-34.50,-58.55],11);
 const esri='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
 L.tileLayer(esri+'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
@@ -40,15 +44,15 @@ L.tileLayer(esri+'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
 L.tileLayer(esri+'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,pane:'shadowPane'}).addTo(map);
 const subLayer=L.layerGroup().addTo(map), stLayer=L.layerGroup().addTo(map), ringLayer=L.layerGroup(),
       pLayer=L.layerGroup().addTo(map), link=L.layerGroup().addTo(map);
-const ctl=L.control.layers(null,{'Subte':subLayer,'Estaciones de tren':stLayer,'Radio ideal a estación':ringLayer,
-  'Propiedades':pLayer},{collapsed:false}).addTo(map);
-const calorPane=map.createPane('calor');  // debajo de propiedades y estaciones
+const ctl=L.control.layers(null,{[T.subte]:subLayer,[T.stations]:stLayer,[T.ring]:ringLayer,
+  [T.listings]:pLayer},{collapsed:false}).addTo(map);
+const calorPane=map.createPane('calor');  // below listings and stations
 calorPane.style.zIndex=350; calorPane.style.pointerEvents='none';
 const lg=L.control({position:'bottomleft'});
 lg.onAdd=()=>{const d=L.DomUtil.create('div','legend');d.innerHTML=
- '<b>Puntaje</b><br><i style="background:#2bd4a4"></i>alto<br><i style="background:#f5a524"></i>medio<br><i style="background:#e5484d"></i>bajo<br><i style="background:#fff;border:2px solid #7aa2ff"></i>estación de tren<br><i style="background:#0d0f12;border:2px solid #c618cc"></i>subte (color de la línea)'+
- '<br><i style="background:linear-gradient(90deg,#3b2a7a,#e5484d,#ffd166);border-radius:2px;width:22px"></i>delitos violentos (CABA)'+
- '<br><i style="background:rgba(255,122,69,.35);border:2px solid #ff7a45;border-radius:2px"></i>barrio popular (RENABAP)';return d};
+ '<b>'+T.score+'</b><br><i style="background:#2bd4a4"></i>'+T.high+'<br><i style="background:#f5a524"></i>'+T.medium+'<br><i style="background:#e5484d"></i>'+T.low+'<br><i style="background:#fff;border:2px solid #7aa2ff"></i>'+T.station+'<br><i style="background:#0d0f12;border:2px solid #c618cc"></i>'+T.subte_legend+
+ '<br><i style="background:linear-gradient(90deg,#3b2a7a,#e5484d,#ffd166);border-radius:2px;width:22px"></i>'+T.crime_legend+
+ '<br><i style="background:rgba(255,122,69,.35);border:2px solid #ff7a45;border-radius:2px"></i>'+T.settlement_legend;return d};
 lg.addTo(map);
 let markers={}, first=true, stations=[];
 function setSeguridad(heat, barrios){
@@ -60,13 +64,13 @@ function setSeguridad(heat, barrios){
     const scale=()=>hl.setOptions({max:heat.max*Math.pow(2,Math.max(0,15-map.getZoom()))});
     hl.on('add',()=>{map.getPane('calor').appendChild(hl._canvas); scale();});
     map.on('zoomend',scale);
-    hl.addTo(map); ctl.addOverlay(hl,'Delitos violentos CABA ('+heat.years.join('–')+')');
+    hl.addTo(map); ctl.addOverlay(hl,T.crime_layer+' ('+heat.years.join('–')+')');
   }
   if(barrios.features.length){
     const bl=L.geoJSON(barrios,{style:{color:'#ff7a45',weight:1.5,fillColor:'#ff7a45',fillOpacity:.25},
-      onEachFeature:(f,l)=>{const p=f.properties; l.bindTooltip('Barrio popular · '+(p.tipo||'')+'<br>'+(p.nombre||'')+
-        ' ('+(p.localidad||p.partido||'')+')'+(p.familias?'<br>~'+p.familias+' familias':''));}});
-    bl.addTo(map); ctl.addOverlay(bl,'Barrios populares GBA Norte (RENABAP)');
+      onEachFeature:(f,l)=>{const p=f.properties; l.bindTooltip(T.settlement+' · '+(p.tipo||'')+'<br>'+(p.nombre||'')+
+        ' ('+(p.localidad||p.partido||'')+')'+(p.familias?'<br>~'+p.familias+' '+T.families:''));}});
+    bl.addTo(map); ctl.addOverlay(bl,T.settlement_layer);
   }
 }
 function setStations(list, ideal){
@@ -105,8 +109,18 @@ function focusOn(id){const m=markers[id]; if(!m) return false; map.setView(m.get
 </script></body></html>"""
 
 
+def js_texts():
+    """Texts used by the page's JavaScript, in the current language."""
+    return {"subte": tr("Subte"), "stations": tr("Train stations"), "ring": tr("Ideal distance to a station"),
+            "listings": tr("Listings"), "score": tr("Score"), "high": tr("high"), "medium": tr("medium"),
+            "low": tr("low"), "station": tr("train station"), "subte_legend": tr("subte (line colour)"),
+            "crime_legend": tr("violent crime (CABA)"), "settlement_legend": tr("informal settlement (RENABAP)"),
+            "crime_layer": tr("Violent crime CABA"), "settlement": tr("Informal settlement"),
+            "families": tr("families"), "settlement_layer": tr("Informal settlements GBA Norte (RENABAP)")}
+
+
 class Page(QWebEnginePage):
-    """Intercepta los links depa://ficha/<id> y depa://abrir/<url> del popup."""
+    """Catches the popup's depa://ficha/<id> (show the listing) and depa://abrir/<url> (open it) links."""
     action = Signal(str, str)
 
     def acceptNavigationRequest(self, url, nav_type, is_main):
@@ -130,7 +144,7 @@ class MapPage(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 16, 12, 12)
         head = QHBoxLayout()
-        head.addWidget(TitleLabel("Mapa", self))
+        head.addWidget(TitleLabel(tr("Map"), self))
         self.count = dim_label("", self)
         head.addSpacing(16)
         head.addWidget(self.count, 1)
@@ -143,7 +157,8 @@ class MapPage(QWidget):
         self.page.action.connect(self._action)
         self.view.setPage(self.page)
         self.view.loadFinished.connect(self._loaded)
-        self.view.setHtml(HTML.replace("__BG__", BG), QUrl("https://depa.local/"))
+        self.view.setHtml(HTML.replace("__BG__", BG).replace("__T__", json.dumps(js_texts(), ensure_ascii=False)),
+                          QUrl("https://depa.local/"))
         body.addWidget(self.view, 1)
         root.addLayout(body, 1)
         state.data_changed.connect(self.refresh)
@@ -158,14 +173,14 @@ class MapPage(QWidget):
             counts = sorted(c[2] for c in heat["cells"])
             heat["max"] = counts[int(len(counts) * 0.95)] if counts else 1
             heat.pop("sources", None)
-            # primero los barrios: comparten el lienzo con propiedades y estaciones y quedan debajo
+            # settlements first: they share the canvas with listings and stations and stay below them
             self.page.runJavaScript(f"setSeguridad({json.dumps(heat)}, "
                                     f"{json.dumps(seguridad.load_barrios(), ensure_ascii=False)})")
             self.page.runJavaScript(f"setStations({json.dumps(st)}, {self.state.settings['estacion_ideal_m']})")
             self.page.runJavaScript(f"setSubte({json.dumps(self.state.subte, ensure_ascii=False)})")
             self.refresh()
         else:
-            self.count.setText("No se pudo cargar el mapa (¿sin internet?).")
+            self.count.setText(tr("The map could not load (no internet?)."))
 
     def refresh(self):
         if not self.ready:
@@ -181,7 +196,7 @@ class MapPage(QWidget):
                 "html": self._popup(r),
             })
         self.page.runJavaScript(f"setData({json.dumps(data, ensure_ascii=False)})")
-        self.count.setText(f"{len(rows)} propiedades en el mapa (las que no se pudieron ubicar no aparecen)")
+        self.count.setText(tr("{n} listings on the map (the ones that could not be located are not shown)", n=len(rows)))
         if self.pending_focus:
             self.focus(self.pending_focus)
             self.pending_focus = None
@@ -189,9 +204,9 @@ class MapPage(QWidget):
     def _popup(self, r):
         esc = lambda s: (s or "").replace("&", "&amp;").replace("<", "&lt;")
         img = f'<img src="{r["photo"]}">' if r.get("photo") else ""
-        bits = [r["tipo"]]
+        bits = [tipo_label(r["tipo"])]
         if r["amb"]:
-            bits.append(f"{r['amb']:.0f} amb.")
+            bits.append(tr("{n} rooms", n=f"{r['amb']:.0f}"))
         m2 = r["m2_cub"] or r["m2_tot"]
         if m2:
             bits.append(f"{m2:.0f} m²")
@@ -199,8 +214,8 @@ class MapPage(QWidget):
             bits.append(f"USD {miles(r['ppm2'])}/m²")
         st = ""
         if r["station_m"] is not None:
-            st = (f"Estación {esc(r['station'])} · {meters(r['station_m'])} · "
-                  f"~{geo.walk_minutes(r['station_m'])} min")
+            st = tr("{station} station · {distance} · ~{minutes} min", station=esc(r["station"]),
+                    distance=meters(r["station_m"]), minutes=geo.walk_minutes(r["station_m"]))
         if r.get("subte_m") is not None and r["subte_m"] <= 1500:
             st += (f"<br>Subte {esc(r['subte_line'])} {esc(r['subte'])} · {meters(r['subte_m'])} · "
                    f"~{geo.walk_minutes(r['subte_m'])} min")
@@ -209,8 +224,9 @@ class MapPage(QWidget):
         return (f'<div class="pp">{img}<span class="sc" style="color:{color}">{r["score"]}</span>'
                 f'<div class="pr">{price}</div><div class="dim">{esc(r["address"])}</div>'
                 f'<div class="dim">{" · ".join(bits)}</div><div class="dim">{st}</div>'
-                f'<a class="b" href="depa://ficha/{r["id"]}">Ver ficha</a>'
-                f'<a class="b b2" href="depa://abrir/{QUrl.toPercentEncoding(r["url"]).data().decode()}">Argenprop</a></div>')
+                f'<a class="b" href="depa://ficha/{r["id"]}">{tr("Details")}</a>'
+                f'<a class="b b2" href="depa://abrir/{QUrl.toPercentEncoding(r["url"]).data().decode()}">'
+                f'{esc(source_name(r))}</a></div>')
 
     def focus(self, lid):
         if not self.ready:

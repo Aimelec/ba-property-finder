@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ..domain import geo
 from ..domain.zones import site_slug, zone_info
+from ..i18n import number, tr
 from ..opendata import geocode, stations
 from ..repositories import listings_db as db
 from ..sources import SOURCES, tokko
@@ -74,8 +75,8 @@ class ScrapeRun:
     def run(self):
         stats = {"nuevos": 0, "bajas": 0, "vistos": 0, "ubicados": 0, "fichas": 0, "error": ""}
         if getattr(self.src, "NEEDS_BROWSER", False) and self.browser is None:
-            stats["error"] = (f"{self.src.NAME} necesita un navegador integrado para descargar "
-                              "(plugin opcional, no incluido): se saltea.")
+            stats["error"] = tr("{site} needs a built-in browser to download (optional plugin, not included): "
+                                "skipped.", site=self.src.NAME)
             self._log(stats["error"])
             return stats
         client = Client(log=self._log, should_stop=lambda: self._stop,
@@ -88,13 +89,13 @@ class ScrapeRun:
             if self.do_details:
                 self._details(client, con, stats)
         except Stopped:
-            self._log("Detenido.")
+            self._log(tr("Stopped."))
         except Blocked:
-            stats["error"] = f"{self.src.NAME} sigue bloqueando. Probá de nuevo en un rato."
+            stats["error"] = tr("{site} keeps refusing. Try again in a while.", site=self.src.NAME)
             self._log(stats["error"])
         except Exception as e:  # an unexpected error must not kill the app
             stats["error"] = f"{self.src.NAME}: {type(e).__name__}: {e}"
-            self._log("Error: " + stats["error"])
+            self._log(tr("Error: ") + stats["error"])
         finally:
             con.commit()
             con.close()
@@ -111,7 +112,7 @@ class ScrapeRun:
         # one whole zone at a time, starting with 'zona_inicio' and then the closest ones
         order = zones_by_distance([k for k, _ in zones], s.get("zona_inicio", "partido-de-san-fernando"))
         zones.sort(key=lambda z: order.index(z[0]))
-        self._log("Orden de zonas: " + ", ".join(zone_info(k)[0] for k, _ in zones))
+        self._log(tr("Zone order: ") + ", ".join(zone_info(k)[0] for k, _ in zones))
         state = {k: {"next": 1, "pages": None, "done": False} for k, _ in zones}
         first = math.ceil(s["avisos_por_zona"] / per)
         deep = max(first, math.ceil(s["avisos_por_zona_norte"] / per))
@@ -124,11 +125,11 @@ class ScrapeRun:
             z = state[key]
             maxp = getattr(self.src, "MAX_PAGES", limit)  # Zonaprop shows at most 9 pages
             while not z["done"] and z["next"] <= min(limit, z["pages"] or limit, maxp):
-                self.on_progress(self.site, done, max(planned, 1), f"{name} · página {z['next']}")
+                self.on_progress(self.site, done, max(planned, 1), tr("{zone} · page {page}", zone=name, page=z["next"]))
                 url = self.src.search_url(s["tipos"], slug, s["precio_min"], s["precio_max"], z["next"])
                 html = client.get(url)
                 if html is None:
-                    self._log(f"{name}: la zona no existe en {self.src.NAME} ({slug}).")
+                    self._log(tr("{zone}: the zone does not exist on {site} ({slug}).", zone=name, site=self.src.NAME, slug=slug))
                     z["done"] = True
                     break
                 if self.site == "ml":
@@ -138,14 +139,14 @@ class ScrapeRun:
                 if z["next"] == 1 and total == 0 and self.site == "ml" and not z.get("retried"):
                     # MercadoLibre sometimes slows down by answering "no results": wait and retry
                     z["retried"] = True
-                    self._log(f"{name}: 0 resultados (posible freno del sitio); reintento en 2 min.")
+                    self._log(tr("{zone}: 0 results (the site may be slowing down); retrying in 2 min.", zone=name))
                     client.sleep(120)
                     continue
                 if z["next"] == 1:
                     if not self._zone_ok(items, name, slug):
                         z["done"] = True
                         break
-                    self._log(f"{name}: {total} avisos en el sitio.")
+                    self._log(tr("{zone}: {n} listings on the site.", zone=name, n=total))
                 z["pages"] = pages
                 self._save(con, items, key, name, group, stats)
                 con.commit()
@@ -158,7 +159,7 @@ class ScrapeRun:
             if not z["done"] and (z["pages"] or 0) > maxp and limit > maxp and self.slicer:
                 done = self.slicer(self, client, con, stats, key, slug, limit, done, planned)
                 z["done"] = True
-        self._log(f"Listados terminados: {stats['vistos']} avisos, {stats['nuevos']} nuevos.")
+        self._log(tr("Result lists finished: {seen} listings, {new} new.", seen=stats["vistos"], new=stats["nuevos"]))
 
     def _agencies(self, client, con, stats):
         """Agency websites (Tokko): each site is read entirely; listings in the chosen zones, price
@@ -172,10 +173,11 @@ class ScrapeRun:
             more = True
             while more and page < tokko.MAX_PAGES:
                 page += 1
-                self.on_progress(self.site, ai, len(agencies), f"{ag['nombre']} · página {page}")
+                self.on_progress(self.site, ai, len(agencies), tr("{zone} · page {page}", zone=ag["nombre"], page=page))
                 html = client.get(tokko.search_url(ag["url"], page))
                 if html is None:
-                    self._log(f"{ag['nombre']}: la web no tiene la plantilla esperada ({ag['url']}/Venta).")
+                    self._log(tr("{agency}: the website doesn't have the expected template ({url}/Venta).",
+                                 agency=ag["nombre"], url=ag["url"]))
                     break
                 items, more = tokko.parse_list(html, ag["url"], ag["nombre"])
                 if page > 1 and "--NoMoreProperties--" in html:  # page 1 contains that text in its JavaScript
@@ -188,8 +190,9 @@ class ScrapeRun:
                     name, group = zone_info(key)
                     self._save(con, its, key, name, group, stats)
                 con.commit()
-            self._log(f"{ag['nombre']}: {page} páginas, {stats['vistos'] - before} avisos en tus zonas y precio.")
-        self._log(f"Inmobiliarias terminadas: {stats['vistos']} avisos, {stats['nuevos']} nuevos.")
+            self._log(tr("{agency}: {pages} pages, {n} listings in your zones and price range.", agency=ag["nombre"],
+                         pages=page, n=stats["vistos"] - before))
+        self._log(tr("Agencies finished: {seen} listings, {new} new.", seen=stats["vistos"], new=stats["nuevos"]))
 
     def _zone_ok(self, items, name, slug):
         """When a site doesn't know a zone it sometimes returns another search: detect that."""
@@ -198,7 +201,7 @@ class ScrapeRun:
         want = _norm(name)
         hits = sum(1 for it in items if want in _norm(it.get("loc")))
         if hits / len(items) < 0.3:
-            self._log(f"{name}: los resultados no son de esa zona ({slug}); la salteo.")
+            self._log(tr("{zone}: the results are not from that zone ({slug}); skipping it.", zone=name, slug=slug))
             return False
         return True
 
@@ -216,7 +219,7 @@ class ScrapeRun:
                 stats["nuevos"] += 1
             elif st == "baja":
                 stats["bajas"] += 1
-                self._log(f"Bajó de precio: {it['address']} → USD {p:,.0f}")
+                self._log(tr("Price dropped: {address} → USD {price}", address=it["address"], price=number(p)))
             if it.get("lat") is not None:
                 station, dist = geo.nearest(self.sts, it["lat"], it["lng"])
                 db.save_list_position(con, it["id"], it["lat"], it["lng"], station, dist)
@@ -247,11 +250,11 @@ class ScrapeRun:
         pend = db.pending_geocode(con, self.site)
         if not pend:
             return
-        self._log(f"Ubicando {len(pend)} avisos por su dirección…")
+        self._log(tr("Locating {n} listings by their address…", n=len(pend)))
         for i, row in enumerate(pend):
             if self._stop:
                 raise Stopped()
-            self.on_progress(self.site, i, len(pend), f"Ubicando {i + 1} de {len(pend)}")
+            self.on_progress(self.site, i, len(pend), tr("Locating {i} of {n}", i=i + 1, n=len(pend)))
             self._geocode_one(con, row["id"], row["address"], row["zona"], row["grupo"], stats)
             # commit after every listing: otherwise the write lock stays taken while the next ones are
             # located (minutes) and the other sources and the window freeze
@@ -262,9 +265,9 @@ class ScrapeRun:
         pend = db.pending_details(con, self.settings["detalles_por_corrida"], self.site)
         if not pend:
             return
-        self._log(f"Leyendo {len(pend)} fichas (ubicación exacta y características)…")
+        self._log(tr("Reading {n} detail pages (exact location and features)…", n=len(pend)))
         for i, row in enumerate(pend):
-            self.on_progress(self.site, i, len(pend), f"Ficha {i + 1} de {len(pend)}")
+            self.on_progress(self.site, i, len(pend), tr("Detail page {i} of {n}", i=i + 1, n=len(pend)))
             html = client.get(row["url"])
             if html is None:  # listing was removed
                 con.execute("UPDATE listings SET detail_at=? WHERE id=?", (db.now(), row["id"]))

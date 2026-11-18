@@ -1,4 +1,4 @@
-"""Página Buscar: qué sitios y zonas descargar, y el progreso (un hilo por sitio)."""
+"""Search page: which sites and zones to download, and the progress (one thread per site)."""
 import re
 from datetime import datetime
 
@@ -10,21 +10,23 @@ from qfluentwidgets import (BodyLabel, CaptionLabel, CheckBox, FluentIcon as FIF
 
 from ..config import DATA, save_settings
 from .. import plugins
+from ..i18n import tr
 from ..sources import tokko
 from ..sources import SITE_NAMES, SOURCES
 from .workers import ScrapeWorker
 from ..domain.zones import DEFAULT_SELECTED, ZONES, zone_info
+from .labels import group_label
 from .common import dim_label
 
 LOG_DIR = DATA / "logs"
-TIPOS = [("departamentos", "Departamentos"), ("casas", "Casas"), ("ph", "PH")]
+TIPOS = [("departamentos", "Apartments"), ("casas", "Houses"), ("ph", "PH")]
 SITE_NOTES = {
-    "ap": "20 avisos/página · una cada ~16 s · necesita el navegador integrado (plugin opcional)",
-    "zp": "30 avisos/página con ubicación exacta · una cada ~7 s",
-    "ml": "48 avisos/página · una cada ~8 s · se ubica por dirección",
-    "tk": "webs propias de inmobiliarias (Tokko) · sin límites · avisos que a veces no están en los portales",
+    "ap": "20 listings/page · one every ~16 s · needs the built-in browser (optional plugin)",
+    "zp": "30 listings/page with exact location · one every ~7 s",
+    "ml": "48 listings/page · one every ~8 s · located by address",
+    "tk": "agencies' own websites (Tokko) · no limits · listings that are sometimes not on the portals",
 }
-# segundos promedio por página (incluye pausas de lote y ubicar por dirección)
+# average seconds per page (including batch pauses and locating by address)
 SECS_PER_PAGE = {"ap": 23, "zp": 29, "ml": 20, "tk": 6}
 
 
@@ -42,7 +44,7 @@ class SearchPage(SmoothScrollArea):
             s["zonas"] = list(DEFAULT_SELECTED)
         s.setdefault("zonas_extra", [])
         s.setdefault("inmobiliarias", [dict(a) for a in tokko.DEFAULT_AGENCIES])
-        if "tk" not in s["sitios"] and not s.get("_tk_sitio"):  # fuente nueva: activarla una vez
+        if "tk" not in s["sitios"] and not s.get("_tk_sitio"):  # new source: turn it on once
             s["sitios"].append("tk")
             s["_tk_sitio"] = True
 
@@ -53,25 +55,25 @@ class SearchPage(SmoothScrollArea):
         root = QVBoxLayout(body)
         root.setContentsMargins(24, 16, 24, 24)
         root.setSpacing(12)
-        root.addWidget(TitleLabel("Buscar", body))
+        root.addWidget(TitleLabel(tr("Search"), body))
         root.addWidget(dim_label(
-            "Descarga avisos de los sitios y zonas marcados, todos los sitios a la vez, cada uno a "
-            "su ritmo seguro. Empieza por San Fernando y sigue zona por zona, de la más cercana a la "
-            "más lejana (a fondo en GBA Norte), así que podés detenerlo cuando quieras: lo leído ya queda guardado y "
-            "aparece en el mapa. Cada aviso se ubica enseguida (Zonaprop trae la ubicación exacta; "
-            "los demás se ubican por dirección con Georef, del Estado).", body))
+            tr("Downloads listings from the checked sites and zones, all sites at once, each at its own safe "
+               "pace. It starts with the start zone and goes zone by zone, from the closest to the farthest (in "
+               "depth in GBA Norte), so you can stop it any time: what was read is already saved and shows on "
+               "the map. Every listing is located right away (Zonaprop has the exact location; the rest are "
+               "located by address with the government's Georef service)."), body))
 
-        # --- sitios ---
+        # --- sites ---
         sites_card = SimpleCardWidget(body)
         sl = QGridLayout(sites_card)
         sl.setContentsMargins(18, 14, 18, 14)
-        sl.addWidget(StrongBodyLabel("Sitios", sites_card), 0, 0)
+        sl.addWidget(StrongBodyLabel(tr("Sites"), sites_card), 0, 0)
         self.site_boxes, self.site_bars, self.site_status = {}, {}, {}
         for i, key in enumerate(("zp", "ml", "ap", "tk"), start=1):
-            cb = CheckBox(SITE_NAMES[key], sites_card)
+            cb = CheckBox(tr(SITE_NAMES[key]), sites_card)
             cb.setChecked(key in s["sitios"])
             cb.stateChanged.connect(self._save)
-            note = CaptionLabel(SITE_NOTES[key], sites_card)
+            note = CaptionLabel(tr(SITE_NOTES[key]), sites_card)
             bar = ProgressBar(sites_card)
             bar.setRange(0, 100)
             bar.setValue(0)
@@ -85,13 +87,13 @@ class SearchPage(SmoothScrollArea):
         sl.setColumnMinimumWidth(3, 230)
         root.addWidget(sites_card)
 
-        # --- inmobiliarias (webs Tokko) ---
+        # --- agencies (Tokko websites) ---
         ag_card = SimpleCardWidget(body)
         al = QVBoxLayout(ag_card)
         al.setContentsMargins(18, 14, 18, 14)
-        al.addWidget(StrongBodyLabel("Inmobiliarias (webs propias con Tokko Broker)", ag_card))
-        al.addWidget(dim_label("Se lee la web entera de cada una y se guardan los avisos de tus zonas. "
-                               "Para sumar otra, pegá su dirección (tiene que tener la página /Venta de Tokko).",
+        al.addWidget(StrongBodyLabel(tr("Agencies (their own Tokko Broker websites)"), ag_card))
+        al.addWidget(dim_label(tr("Each website is read entirely and the listings in your zones are saved. To add "
+                                  "another one, paste its address (it must have Tokko's /Venta page)."),
                                ag_card))
         self.ag_grid = QGridLayout()
         al.addLayout(self.ag_grid)
@@ -100,8 +102,8 @@ class SearchPage(SmoothScrollArea):
             self._agency_box(ag)
         ag_row = QHBoxLayout()
         self.ag_edit = LineEdit(ag_card)
-        self.ag_edit.setPlaceholderText("ej. https://www.leoresia.com")
-        ag_btn = PushButton(FIF.ADD, "Agregar inmobiliaria", ag_card)
+        self.ag_edit.setPlaceholderText(tr("e.g. https://www.example-agency.com"))
+        ag_btn = PushButton(FIF.ADD, tr("Add agency"), ag_card)
         ag_btn.clicked.connect(self._add_agency)
         self.ag_edit.returnPressed.connect(self._add_agency)
         ag_row.addWidget(self.ag_edit, 1)
@@ -109,16 +111,16 @@ class SearchPage(SmoothScrollArea):
         al.addLayout(ag_row)
         root.addWidget(ag_card)
 
-        # --- zonas ---
+        # --- zones ---
         self.zone_boxes = {}
         zones_card = SimpleCardWidget(body)
         zl = QVBoxLayout(zones_card)
         zl.setContentsMargins(18, 14, 18, 14)
         for group, items in ZONES.items():
             head = QHBoxLayout()
-            head.addWidget(StrongBodyLabel(group, zones_card))
-            all_btn = PushButton("Todas", zones_card)
-            none_btn = PushButton("Ninguna", zones_card)
+            head.addWidget(StrongBodyLabel(group_label(group), zones_card))
+            all_btn = PushButton(tr("All"), zones_card)
+            none_btn = PushButton(tr("None"), zones_card)
             all_btn.setFixedHeight(26)
             none_btn.setFixedHeight(26)
             keys = [z[0] for z in items]
@@ -137,13 +139,13 @@ class SearchPage(SmoothScrollArea):
                 self.zone_boxes[z[0]] = cb
             zl.addLayout(grid)
             zl.addSpacing(6)
-        zl.addWidget(StrongBodyLabel("Otras zonas, solo Argenprop (pegá una URL de Argenprop o el nombre)", zones_card))
+        zl.addWidget(StrongBodyLabel(tr("Other zones, Argenprop only (paste an Argenprop URL or the name)"), zones_card))
         self.extra_grid = QGridLayout()
         zl.addLayout(self.extra_grid)
         add_row = QHBoxLayout()
         self.extra_edit = LineEdit(zones_card)
-        self.extra_edit.setPlaceholderText("ej. https://www.argenprop.com/departamentos/venta/victoria  o  victoria")
-        add_btn = PushButton(FIF.ADD, "Agregar", zones_card)
+        self.extra_edit.setPlaceholderText(tr("e.g. https://www.argenprop.com/departamentos/venta/victoria  or  victoria"))
+        add_btn = PushButton(FIF.ADD, tr("Add"), zones_card)
         add_btn.clicked.connect(self._add_extra)
         self.extra_edit.returnPressed.connect(self._add_extra)
         add_row.addWidget(self.extra_edit, 1)
@@ -153,7 +155,7 @@ class SearchPage(SmoothScrollArea):
             self._extra_box(slug)
         root.addWidget(zones_card)
 
-        # --- opciones ---
+        # --- options ---
         opt = SimpleCardWidget(body)
         ol = QGridLayout(opt)
         ol.setContentsMargins(18, 14, 18, 14)
@@ -162,40 +164,40 @@ class SearchPage(SmoothScrollArea):
         tl = QHBoxLayout()
         tl.setSpacing(24)
         for key, label in TIPOS:
-            cb = CheckBox(label, opt)
+            cb = CheckBox(tr(label), opt)
             cb.setChecked(key in s["tipos"])
             cb.stateChanged.connect(self._save)
             tl.addWidget(cb)
             self.tipo_boxes[key] = cb
         tl.addStretch(1)
-        ol.addWidget(StrongBodyLabel("Tipos", opt), 0, 0)
+        ol.addWidget(StrongBodyLabel(tr("Types"), opt), 0, 0)
         ol.addLayout(tl, 1, 0, 1, 3)
         self.spins = {}
         for col, (key, label, mx, step) in enumerate([
-                ("precio_min", "Precio desde (USD)", 5_000_000, 5000),
-                ("precio_max", "Precio hasta (USD)", 5_000_000, 5000),
-                ("avisos_por_zona", "Avisos por zona (CABA y resto)", 20000, 50),
-                ("avisos_por_zona_norte", "Avisos por zona GBA Norte (a fondo)", 50000, 100),
-                ("detalles_por_corrida", "Fichas Argenprop al final", 5000, 10)]):
+                ("precio_min", "Price from (USD)", 5_000_000, 5000),
+                ("precio_max", "Price up to (USD)", 5_000_000, 5000),
+                ("avisos_por_zona", "Listings per zone (CABA and the rest)", 20000, 50),
+                ("avisos_por_zona_norte", "Listings per GBA Norte zone (in depth)", 50000, 100),
+                ("detalles_por_corrida", "Argenprop detail pages at the end", 5000, 10)]):
             sb = SpinBox(opt)
             sb.setRange(0, mx)
             sb.setSingleStep(step)
             sb.setValue(int(s[key]))
             sb.valueChanged.connect(self._save)
-            ol.addWidget(BodyLabel(label, opt), 2, col)
+            ol.addWidget(BodyLabel(tr(label), opt), 2, col)
             ol.addWidget(sb, 3, col)
             self.spins[key] = sb
         self.estimate = dim_label("", opt)
         ol.addWidget(self.estimate, 4, 0, 1, 5)
         root.addWidget(opt)
 
-        # --- acciones ---
+        # --- actions ---
         actions = QHBoxLayout()
-        self.run_btn = PrimaryPushButton(FIF.PLAY, "Buscar", body)
+        self.run_btn = PrimaryPushButton(FIF.PLAY, tr("Search"), body)
         self.run_btn.clicked.connect(lambda: self.start(True, True))
-        self.det_btn = PushButton(FIF.PIN, "Solo ubicar / fichas pendientes", body)
+        self.det_btn = PushButton(FIF.PIN, tr("Only locate / pending detail pages"), body)
         self.det_btn.clicked.connect(lambda: self.start(False, True))
-        self.stop_btn = PushButton(FIF.PAUSE, "Detener", body)
+        self.stop_btn = PushButton(FIF.PAUSE, tr("Stop"), body)
         self.stop_btn.setEnabled(False)
         self.stop_btn.clicked.connect(self.stop)
         for b in (self.run_btn, self.det_btn, self.stop_btn):
@@ -210,7 +212,7 @@ class SearchPage(SmoothScrollArea):
         self.setWidget(body)
         self._update_estimate()
 
-    # --- inmobiliarias ---
+    # --- agencies ---
     def _agency_box(self, ag):
         cb = CheckBox(f"{ag['nombre']}  ·  {ag['url'].replace('https://', '').replace('www.', '')}", self)
         cb.setChecked(ag.get("activa", True))
@@ -234,7 +236,7 @@ class SearchPage(SmoothScrollArea):
         self.ag_edit.clear()
         self._save()
 
-    # --- zonas ---
+    # --- zones ---
     def _set_zones(self, keys, on):
         for k in keys:
             self.zone_boxes[k].setChecked(on)
@@ -259,7 +261,7 @@ class SearchPage(SmoothScrollArea):
         self.zone_boxes[slug].setChecked(True)
         self.extra_edit.clear()
 
-    # --- ajustes ---
+    # --- settings ---
     def _save(self, *_):
         s = self.state.settings
         s["zonas"] = [k for k, cb in self.zone_boxes.items() if cb.isChecked()]
@@ -278,7 +280,8 @@ class SearchPage(SmoothScrollArea):
         for site in s["sitios"]:
             if site == "tk":
                 n_ag = sum(1 for a in s.get("inmobiliarias", []) if a.get("activa", True))
-                parts.append(f"Inmobiliarias: {n_ag} webs (~{n_ag * 10 * SECS_PER_PAGE['tk'] / 60:.0f} min)")
+                parts.append(tr("Agencies: {n} websites (~{minutes} min)", n=n_ag,
+                                minutes=f"{n_ag * 10 * SECS_PER_PAGE['tk'] / 60:.0f}"))
                 continue
             per = SOURCES[site].PER_PAGE
             first = -(-s["avisos_por_zona"] // per)
@@ -286,28 +289,29 @@ class SearchPage(SmoothScrollArea):
             pages = first * len(zonas) + (deep - first) * norte
             secs = pages * SECS_PER_PAGE[site]
             worst = max(worst, secs)
-            parts.append(f"{SITE_NAMES[site]} hasta {pages} páginas (~{secs / 3600:.1f} h)")
+            parts.append(tr("{site} up to {pages} pages (~{hours} h)", site=tr(SITE_NAMES[site]), pages=pages,
+                            hours=f"{secs / 3600:.1f}"))
         self.estimate.setText(
-            f"{len(zonas)} zonas ({norte} de GBA Norte). " + " · ".join(parts)
-            + f". Como máximo ~{worst / 3600:.1f} h (los sitios corren en paralelo; muchas zonas "
-              "tienen menos avisos que el máximo y terminan antes).")
+            tr("{zones} zones ({north} in GBA Norte). ", zones=len(zonas), north=norte) + " · ".join(parts)
+            + tr(". At most ~{hours} h (the sites run in parallel; many zones have fewer listings than the "
+                 "maximum and finish sooner).", hours=f"{worst / 3600:.1f}"))
 
-    # --- descarga ---
+    # --- download ---
     def start(self, do_list, do_details):
         s = self.state.settings
         if do_list and (not s["zonas"] or not s["tipos"] or not s["sitios"]):
-            InfoBar.warning("Falta elegir", "Marcá al menos un sitio, una zona y un tipo.",
+            InfoBar.warning(tr("Something is missing"), tr("Check at least one site, one zone and one type."),
                             parent=self.window(), position=InfoBarPosition.TOP_RIGHT)
             return
         self.totals = {}
-        self._log("── Inicio: " + ", ".join(SITE_NAMES[x] for x in s["sitios"]))
+        self._log(tr("── Start: ") + ", ".join(tr(SITE_NAMES[x]) for x in s["sitios"]))
         for site in s["sitios"]:
             w = ScrapeWorker(site, dict(s), list(s["zonas"]), self.browser, do_list, do_details)
             w.log.connect(self._log)
             w.progress.connect(self._progress)
             w.finished_ok.connect(self._done)
             self.workers[site] = w
-            self.site_status[site].setText("empezando…")
+            self.site_status[site].setText(tr("starting…"))
             w.start()
         self._busy(True)
 
@@ -315,7 +319,7 @@ class SearchPage(SmoothScrollArea):
         for w in self.workers.values():
             w.stop()
         for site in self.workers:
-            self.site_status[site].setText("deteniendo…")
+            self.site_status[site].setText(tr("stopping…"))
 
     def _busy(self, busy):
         self.run_btn.setEnabled(not busy)
@@ -325,7 +329,7 @@ class SearchPage(SmoothScrollArea):
     def _log(self, text):
         line = f"{datetime.now():%H:%M:%S}  {text}"
         self.log.appendPlainText(line)
-        try:  # copia en data/logs/ para revisar después
+        try:  # copy in data/logs/ to review later
             LOG_DIR.mkdir(exist_ok=True)
             with open(LOG_DIR / f"busqueda_{datetime.now():%Y-%m-%d}.log", "a", encoding="utf-8") as f:
                 f.write(line + "\n")
@@ -336,23 +340,24 @@ class SearchPage(SmoothScrollArea):
         self.site_bars[site].setValue(int(100 * cur / max(1, total)))
         self.site_status[site].setText(label)
         self._pages += 1
-        if self._pages % 10 == 0:  # ir mostrando lo nuevo sin esperar al final
+        if self._pages % 10 == 0:  # show new listings without waiting for the end
             self.state.reload()
 
     def _done(self, site, st):
         w = self.workers.pop(site, None)
         if w is not None:
-            # finished_ok sale desde adentro de run(): esperar a que el hilo termine de verdad.
-            # Si se suelta la última referencia antes, Qt destruye un QThread en marcha y
-            # cierra la app de golpe (pasaba al terminar el primer sitio, ej. Inmobiliarias).
+            # finished_ok is emitted from inside run(): wait until the thread has really finished.
+            # Dropping the last reference earlier makes Qt destroy a running QThread, which closes
+            # the app at once (it happened when the first site finished, e.g. the agencies).
             w.wait()
         self.totals[site] = st
         if not st["error"]:
             self.site_bars[site].setValue(100)
-        self.site_status[site].setText("con error" if st["error"] else "terminado")
-        self._log(f"── {SITE_NAMES[site]} terminó: {st['vistos']} avisos, {st['nuevos']} nuevos, "
-                  f"{st['bajas']} bajaron de precio, {st['ubicados']} ubicados por dirección"
-                  + (f", {st['fichas']} fichas" if st["fichas"] else ""))
+        self.site_status[site].setText(tr("with errors") if st["error"] else tr("finished"))
+        self._log(tr("── {site} finished: {seen} listings, {new} new, {dropped} dropped in price, {located} located "
+                     "by address", site=tr(SITE_NAMES[site]), seen=st["vistos"], new=st["nuevos"],
+                     dropped=st["bajas"], located=st["ubicados"])
+                  + (tr(", {n} detail pages", n=st["fichas"]) if st["fichas"] else ""))
         self.state.reload()
         if self.workers:
             return
@@ -360,8 +365,8 @@ class SearchPage(SmoothScrollArea):
         nuevos = sum(t["nuevos"] for t in self.totals.values())
         errors = [t["error"] for t in self.totals.values() if t["error"]]
         if errors:
-            InfoBar.warning("Búsqueda terminada con avisos", " ".join(errors), duration=8000,
+            InfoBar.warning(tr("Search finished with warnings"), " ".join(errors), duration=8000,
                             parent=self.window(), position=InfoBarPosition.TOP_RIGHT)
         else:
-            InfoBar.success("Búsqueda terminada", f"{nuevos} avisos nuevos en total.",
+            InfoBar.success(tr("Search finished"), tr("{n} new listings in total.", n=nuevos),
                             duration=6000, parent=self.window(), position=InfoBarPosition.TOP_RIGHT)

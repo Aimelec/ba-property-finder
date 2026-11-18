@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 import requests
 
 from ..config import DATA
+from ..i18n import tr
 
 # one line per request, to tune each site's pace: data/logs/pedidos.csv
 REQ_LOG = DATA / "logs" / "pedidos.csv"
@@ -79,11 +80,11 @@ class Client:
 
     def _wait_turn(self):
         if self.rest and self._total and self._total % self.rest[0] == 0:
-            self.log(f"Descanso de {self.rest[1] // 60} min ({self._total} páginas leídas)…")
+            self.log(tr("Resting {minutes} min ({pages} pages read)…", minutes=self.rest[1] // 60, pages=self._total))
             self.sleep(self.rest[1])
             self._count = 0
         if self.batch and self._count and self._count % self.batch[0] == 0:
-            self.log(f"Pausa de {self.batch[1] // 60} min para no ser bloqueado…")
+            self.log(tr("Pausing {minutes} min to keep a gentle pace…", minutes=self.batch[1] // 60))
             self.sleep(self.batch[1])
         gap = random.uniform(*self.pause) - (time.time() - self._last)
         if gap > 0:
@@ -107,7 +108,7 @@ class Client:
                 return html
             if attempt == len(waits):
                 break
-            self.log(f"{why}: espero {waits[attempt] // 60} min y reintento…")
+            self.log(tr("{reason}: waiting {minutes} min, then retrying…", reason=why, minutes=waits[attempt] // 60))
             self.sleep(waits[attempt])
             self._count = 0  # after waiting, the batch starts over
         raise Blocked(url)
@@ -120,16 +121,16 @@ class Client:
             if self.should_stop():
                 raise Stopped()
             if html is None:
-                return None, True, "La página no cargó"
+                return None, True, tr("The page did not load")
             return html or None, False, ""
         try:
             r = self.s.get(url, timeout=30)
         except requests.RequestException as e:
             self._status = type(e).__name__
-            return None, True, f"Error de red ({type(e).__name__})"
+            return None, True, tr("Network error ({error})", error=type(e).__name__)
         self._status = r.status_code
         if r.status_code == 404:
             return None, False, ""
         if r.status_code == 200 and not any(s in r.text[:5000] for s in BLOCK_SIGNS):
             return r.text, False, ""
-        return None, True, f"Bloqueo del sitio (HTTP {r.status_code})"
+        return None, True, tr("The site refused (HTTP {status})", status=r.status_code)

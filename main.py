@@ -9,6 +9,7 @@ from qfluentwidgets import (FluentIcon as FIF, FluentWindow, NavigationItemPosit
                             setTheme, setThemeColor)
 
 from depa_app.config import load_settings
+from depa_app.i18n import set_language, tr
 from depa_app.ui.app_state import AppState
 from depa_app.ui.common import ACCENT, BG, GLOBAL_QSS
 from depa_app.ui.home import HomePage
@@ -22,7 +23,7 @@ class MainWindow(FluentWindow):
     def __init__(self, state):
         super().__init__()
         self.state = state
-        self.setWindowTitle("depa · propiedades")
+        self.setWindowTitle(tr("depa · properties"))
         self.resize(1500, 900)
         self.setMicaEffectEnabled(False)
         self.setCustomBackgroundColor(QColor(BG), QColor(BG))
@@ -32,11 +33,11 @@ class MainWindow(FluentWindow):
         self.map = MapPage(state, self.go_to_listing, self)
         self.search = SearchPage(state, self)
         self.prefs = PrefsPage(state, self)
-        self.addSubInterface(self.home, FIF.HOME, "Inicio")
-        self.addSubInterface(self.listings, FIF.TILES, "Propiedades")
-        self.addSubInterface(self.map, FIF.GLOBE, "Mapa")
-        self.addSubInterface(self.search, FIF.SEARCH, "Buscar")
-        self.addSubInterface(self.prefs, FIF.SETTING, "Preferencias", NavigationItemPosition.BOTTOM)
+        self.addSubInterface(self.home, FIF.HOME, tr("Home"))
+        self.addSubInterface(self.listings, FIF.TILES, tr("Listings"))
+        self.addSubInterface(self.map, FIF.GLOBE, tr("Map"))
+        self.addSubInterface(self.search, FIF.SEARCH, tr("Search"))
+        self.addSubInterface(self.prefs, FIF.SETTING, tr("Preferences"), NavigationItemPosition.BOTTOM)
         self.navigationInterface.setExpandWidth(190)
         state.map_focus_request.connect(self.go_to_map)
         # si buscar.bat (u otra ventana) agrega avisos, recargar solo
@@ -99,7 +100,9 @@ def main():
     setTheme(Theme.DARK)
     setThemeColor(ACCENT)
     app.setStyleSheet(GLOBAL_QSS)
-    state = AppState(load_settings())
+    settings = load_settings()
+    set_language(settings.get("idioma", "en"))   # before any widget is built
+    state = AppState(settings)
     win = MainWindow(state)
     state.reload()
     win.show()

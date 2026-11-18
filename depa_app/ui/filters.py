@@ -1,4 +1,4 @@
-"""Panel de filtros (se usa en Propiedades y en Mapa, sincronizados)."""
+"""Filters panel (used on the Listings and Map pages, kept in sync)."""
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QGridLayout, QVBoxLayout, QWidget
 from qfluentwidgets import (BodyLabel, CheckBox, SearchLineEdit, SpinBox, StrongBodyLabel,
@@ -6,24 +6,26 @@ from qfluentwidgets import (BodyLabel, CheckBox, SearchLineEdit, SpinBox, Strong
 
 from ..config import save_settings
 from ..domain.zones import GROUPS
+from ..i18n import tr
+from .labels import group_label, tipo_label
 
 TIPOS = ["Departamento", "Casa", "PH"]
-SITIOS = [("ap", "Argenprop"), ("zp", "Zonaprop"), ("ml", "MercadoLibre"), ("tk", "Inmobiliarias")]
-NUMS = [  # clave, etiqueta, máximo, paso
-    ("precio_min", "Precio mín. (USD)", 5_000_000, 5000),
-    ("precio_max", "Precio máx. (USD)", 5_000_000, 5000),
-    ("amb_min", "Ambientes mín.", 10, 1),
-    ("m2_min", "m² mín.", 2000, 5),
-    ("dist_max", "Máx. a estación (m)", 10000, 100),
-    ("expensas_max", "Expensas máx. ($)", 5_000_000, 10000),
+SITIOS = [("ap", "Argenprop"), ("zp", "Zonaprop"), ("ml", "MercadoLibre"), ("tk", "Agencies")]
+NUMS = [  # key, label, maximum, step
+    ("precio_min", "Min. price (USD)", 5_000_000, 5000),
+    ("precio_max", "Max. price (USD)", 5_000_000, 5000),
+    ("amb_min", "Min. rooms", 10, 1),
+    ("m2_min", "Min. m²", 2000, 5),
+    ("dist_max", "Max. to a station (m)", 10000, 100),
+    ("expensas_max", "Max. monthly fees ($)", 5_000_000, 10000),
 ]
 FLAGS = [
-    ("solo_credito", "Solo apto crédito"),
-    ("solo_cochera", "Solo con cochera"),
-    ("solo_favoritos", "Solo favoritos"),
-    ("ocultar_descartados", "Ocultar descartados"),
-    ("ocultar_duplicados", "Ocultar repetidos (mismo inmueble en otro sitio)"),
-    ("solo_con_ubicacion", "Solo con ubicación"),
+    ("solo_credito", "Mortgage-eligible only"),
+    ("solo_cochera", "With parking only"),
+    ("solo_favoritos", "Favourites only"),
+    ("ocultar_descartados", "Hide discarded"),
+    ("ocultar_duplicados", "Hide duplicates (same property on another site)"),
+    ("solo_con_ubicacion", "Located only"),
 ]
 
 
@@ -41,7 +43,7 @@ class FilterPanel(SmoothScrollArea):
         lay.setSpacing(6)
 
         self.search = SearchLineEdit(body)
-        self.search.setPlaceholderText("Buscar dirección, zona, estación…")
+        self.search.setPlaceholderText(tr("Search address, zone, station…"))
         self.search.textChanged.connect(self._text)
         lay.addWidget(self.search)
 
@@ -53,44 +55,44 @@ class FilterPanel(SmoothScrollArea):
             sb.setRange(0, mx)
             sb.setSingleStep(step)
             sb.valueChanged.connect(self._changed)
-            grid.addWidget(BodyLabel(label, body), 2 * i, 0)
+            grid.addWidget(BodyLabel(tr(label), body), 2 * i, 0)
             grid.addWidget(sb, 2 * i + 1, 0)
             self.nums[k] = sb
         lay.addLayout(grid)
-        lay.addWidget(BodyLabel("0 = sin límite", body))
+        lay.addWidget(BodyLabel(tr("0 = no limit"), body))
 
         lay.addSpacing(6)
-        lay.addWidget(StrongBodyLabel("Tipo", body))
+        lay.addWidget(StrongBodyLabel(tr("Type"), body))
         self.tipos = {}
         for t in TIPOS:
-            cb = CheckBox(t, body)
+            cb = CheckBox(tipo_label(t), body)
             cb.stateChanged.connect(self._changed)
             lay.addWidget(cb)
             self.tipos[t] = cb
 
         lay.addSpacing(6)
-        lay.addWidget(StrongBodyLabel("Sitios", body))
+        lay.addWidget(StrongBodyLabel(tr("Sites"), body))
         self.sitios = {}
         for k, label in SITIOS:
-            cb = CheckBox(label, body)
+            cb = CheckBox(tr(label), body)
             cb.stateChanged.connect(self._changed)
             lay.addWidget(cb)
             self.sitios[k] = cb
 
         lay.addSpacing(6)
-        lay.addWidget(StrongBodyLabel("Zonas", body))
+        lay.addWidget(StrongBodyLabel(tr("Zones"), body))
         self.grupos = {}
         for g in GROUPS:
-            cb = CheckBox(g, body)
+            cb = CheckBox(group_label(g), body)
             cb.stateChanged.connect(self._changed)
             lay.addWidget(cb)
             self.grupos[g] = cb
 
         lay.addSpacing(6)
-        lay.addWidget(StrongBodyLabel("Otros", body))
+        lay.addWidget(StrongBodyLabel(tr("Other"), body))
         self.flags = {}
         for k, label in FLAGS:
-            cb = CheckBox(label, body)
+            cb = CheckBox(tr(label), body)
             cb.stateChanged.connect(self._changed)
             lay.addWidget(cb)
             self.flags[k] = cb

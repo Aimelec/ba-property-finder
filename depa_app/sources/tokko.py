@@ -12,7 +12,7 @@ from selectolax.lexbor import LexborHTMLParser
 
 
 SITE = "tk"
-NAME = "Inmobiliarias"
+NAME = "Agencies"  # shown through tr(): "Inmobiliarias" in Spanish
 PER_PAGE = 20
 CLIENT_OPTS = {"pause": (3.0, 5.0), "block_waits": (60, 180, 600)}
 MAX_PAGES = 80

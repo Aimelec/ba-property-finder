@@ -1,8 +1,10 @@
-"""Helpers de formato, colores y animaciones compartidos por las páginas."""
+"""Formatting helpers, colours and animations shared by the pages."""
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QGraphicsOpacityEffect, QVBoxLayout
 from qfluentwidgets import BodyLabel, CaptionLabel, SimpleCardWidget, TitleLabel
+
+from ..i18n import number, tr
 
 ACCENT = "#2bd4a4"
 BG = "#16181d"
@@ -11,10 +13,10 @@ TEXT_DIM = "#9aa3ad"
 
 
 def miles(x, prefix=""):
-    """12345.6 -> '12.346' (formato argentino)."""
+    """12345.6 -> '12,346' (English) / '12.346' (Spanish)."""
     if x is None:
         return "—"
-    return prefix + f"{x:,.0f}".replace(",", ".")
+    return prefix + number(x)
 
 
 def usd(x):
@@ -24,11 +26,11 @@ def usd(x):
 def meters(m):
     if m is None:
         return "—"
-    return f"{m / 1000:.1f} km".replace(".", ",") if m >= 1000 else f"{m:.0f} m"
+    return f"{number(m / 1000, 1)} km" if m >= 1000 else f"{m:.0f} m"
 
 
 def score_color(score):
-    """0 rojo -> 50 ámbar -> 100 verde."""
+    """0 red -> 50 amber -> 100 green."""
     s = max(0, min(100, score or 0)) / 100
     if s < 0.5:
         a, b, t = QColor("#e5484d"), QColor("#f5a524"), s / 0.5
@@ -40,7 +42,7 @@ def score_color(score):
 
 
 def fade_in(widget, ms=260):
-    """Aparición suave (opacidad 0 -> 1)."""
+    """Smooth appearance (opacity 0 -> 1)."""
     eff = widget.graphicsEffect()
     if not isinstance(eff, QGraphicsOpacityEffect):
         eff = QGraphicsOpacityEffect(widget)
@@ -61,7 +63,7 @@ class StatCard(SimpleCardWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 12, 18, 12)
         self.value = TitleLabel("—", self)
-        self.caption = CaptionLabel(title, self)
+        self.caption = CaptionLabel(tr(title), self)
         self.caption.setTextColor(QColor(TEXT_DIM), QColor(TEXT_DIM))
         lay.addWidget(self.value)
         lay.addWidget(self.caption)
@@ -74,6 +76,7 @@ class StatCard(SimpleCardWidget):
 
 
 def dim_label(text, parent=None):
+    """Wrapped, dimmed text (already translated by the caller)."""
     lab = BodyLabel(text, parent)
     lab.setTextColor(QColor(TEXT_DIM), QColor(TEXT_DIM))
     lab.setWordWrap(True)
