@@ -1,11 +1,11 @@
-"""Estaciones de tren del AMBA (OpenStreetMap) y distancia a la más cercana."""
+"""AMBA rail stations from OpenStreetMap (data/estaciones.json)."""
 import json
 
 import requests
 
-from .config import STATIONS_PATH
+from ..config import STATIONS_PATH
 
-BBOX = "-35.10,-59.20,-34.25,-58.05"  # sur, oeste, norte, este
+BBOX = "-35.10,-59.20,-34.25,-58.05"  # south, west, north, east
 QUERY = f"""[out:json][timeout:90];
 (node["railway"="station"]["station"!="subway"]({BBOX});
  node["railway"="halt"]({BBOX}););
@@ -14,9 +14,9 @@ out body;"""
 LINES = ["Mitre", "Sarmiento", "Roca", "San Martín", "Belgrano Norte", "Belgrano Sur",
          "Urquiza", "Tren de la Costa", "Belgrano"]
 
-# servicios con trenes muy espaciados: no cuentan para el puntaje ni se muestran (pedido del usuario).
-# Ramales diésel del Mitre (Victoria–Capilla del Señor y Villa Ballester–Zárate) sin las cabeceras
-# Victoria y Villa Ballester, que también son del Mitre eléctrico; y el Tren de la Costa entero.
+# Services with infrequent trains don't count for the score and aren't shown: the Mitre diesel branches
+# (Victoria–Capilla del Señor and Villa Ballester–Zárate, except Victoria and Villa Ballester themselves,
+# which are on the electric Mitre too) and the whole Tren de la Costa.
 SLOW_LINES = {"Tren de la Costa"}
 SLOW_STATIONS = {("Mitre", n) for n in (
     "Doctor Albert Schweitzer", "Bancalari R", "General Pacheco", "El Talar", "López Camelo",
@@ -25,7 +25,7 @@ SLOW_STATIONS = {("Mitre", n) for n in (
 
 
 def frequent(stations):
-    """Sin las estaciones de servicios lentos (SLOW_LINES / SLOW_STATIONS)."""
+    """Without the stations of slow services (SLOW_LINES / SLOW_STATIONS)."""
     return [s for s in stations
             if s["line"] not in SLOW_LINES and (s["line"], s["name"]) not in SLOW_STATIONS]
 
@@ -55,7 +55,7 @@ def download():
 
 
 def load():
-    """Estaciones que cuentan (el archivo guarda todas, sin filtrar)."""
+    """Stations that count (the file keeps all of them, unfiltered)."""
     if STATIONS_PATH.exists():
         return frequent(json.loads(STATIONS_PATH.read_text(encoding="utf-8")))
     return download()

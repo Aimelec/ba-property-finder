@@ -1,12 +1,12 @@
-"""Subte de Buenos Aires (líneas con su color oficial y estaciones) desde OpenStreetMap.
+"""Buenos Aires subte (lines with their official colour, and stations) from OpenStreetMap.
 
-Se baja una vez a data/subte.json; solo se usa para dibujar el mapa.
+Downloaded once to data/subte.json; only used to draw the map.
 """
 import json
 
 import requests
 
-from .config import DATA
+from ..config import DATA
 
 SUBTE_PATH = DATA / "subte.json"
 SERVERS = ["https://overpass-api.de/api/interpreter",
@@ -18,7 +18,7 @@ area["name"="Ciudad Autónoma de Buenos Aires"]["boundary"="administrative"]->.c
 out geom;
 node["railway"="station"]["station"="subway"](-34.75,-58.55,-34.50,-58.33);
 out body;"""
-# colores oficiales por si OSM no trae 'colour'
+# official colours, in case OSM has no 'colour' tag
 COLORS = {"A": "#18cccc", "B": "#eb0909", "C": "#233aa8", "D": "#02db2e", "E": "#c618cc",
           "H": "#ffdd00", "P": "#ffa500"}
 
@@ -60,7 +60,7 @@ def download():
         for m in e.get("members", []):
             if m["type"] == "way" and m.get("geometry"):
                 path = [[round(p["lat"], 6), round(p["lon"], 6)] for p in m["geometry"]]
-                if path not in ln["paths"]:  # ida y vuelta comparten vías
+                if path not in ln["paths"]:  # both directions share the same tracks
                     ln["paths"].append(path)
     stations = []
     for e in els:
@@ -69,8 +69,8 @@ def download():
             ref = (t.get("line") or t.get("ref") or "").upper()
             stations.append({"name": t["name"], "line": ref[:1] if ref[:1] in COLORS else ref,
                              "lat": e["lat"], "lng": e["lon"]})
-    # OSM no siempre dice de qué línea es cada estación: la más cercana a su recorrido
-    from .domain.geo import haversine
+    # OSM doesn't always say which line a station is on: use the closest line
+    from ..domain.geo import haversine
     for st in stations:
         if st["line"] in COLORS:
             continue

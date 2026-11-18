@@ -1,9 +1,9 @@
-"""Base SQLite: avisos + historial de precios."""
+"""SQLite database: listings + price history (data/propiedades.db)."""
 import json
 import sqlite3
 from datetime import datetime
 
-from .config import DB_PATH
+from ..config import DB_PATH
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS listings (
@@ -35,22 +35,22 @@ def now():
 def connect():
     con = sqlite3.connect(DB_PATH, timeout=120)
     con.row_factory = sqlite3.Row
-    con.execute("PRAGMA journal_mode=WAL")  # varios sitios escriben a la vez y la app lee
+    con.execute("PRAGMA journal_mode=WAL")  # several sources write at once while the window reads
     con.executescript(SCHEMA)
     cols = {r[1] for r in con.execute("PRAGMA table_info(listings)")}
     for col, decl in (("geo_src", "TEXT"), ("geo_tried", "INTEGER DEFAULT 0")):
         if col not in cols:
             con.execute(f"ALTER TABLE listings ADD COLUMN {col} {decl}")
-    # solo escribir si hace falta: un UPDATE pide el bloqueo de escritura aunque no cambie nada,
-    # y la ventana (que solo quiere leer) se quedaba esperando a que un sitio terminara de escribir
+    # write only when needed: an UPDATE takes the write lock even when it changes nothing, and the
+    # window (which only wants to read) used to wait until a source finished writing
     if con.execute("SELECT 1 FROM listings WHERE lat IS NOT NULL AND geo_src IS NULL LIMIT 1").fetchone():
         con.execute("UPDATE listings SET geo_src='ficha' WHERE lat IS NOT NULL AND geo_src IS NULL")
-    con.commit()  # si no, esta conexión retiene el bloqueo de escritura y traba a las demás
+    con.commit()  # otherwise this connection keeps the write lock and blocks the others
     return con
 
 
 def upsert_list_item(con, it):
-    """Guarda un aviso del listado. Devuelve 'nuevo', 'baja' (bajó el precio) o ''."""
+    """Saves a listing from a result list. Returns 'nuevo' (new), 'baja' (price went down) or ''."""
     t = now()
     if isinstance(it.get("features"), dict):
         it = dict(it, features=json.dumps(it["features"], ensure_ascii=False))
@@ -62,7 +62,7 @@ def upsert_list_item(con, it):
         con.execute(f"INSERT INTO listings ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})", vals)
         status = "nuevo"
     else:
-        # no pisar con vacío lo que ya completó la ficha de detalle
+        # don't overwrite with empty values what the detail page already filled in
         sets = {f: it.get(f) for f in LIST_FIELDS if it.get(f) is not None}
         sets["last_seen"] = t
         con.execute(f"UPDATE listings SET {', '.join(k + '=?' for k in sets)} WHERE id=?",
@@ -89,7 +89,7 @@ def save_detail(con, lid, d, station=None, station_m=None):
 
 
 def pending_details(con, limit, site="ap"):
-    """Fichas sin leer: primero favoritos, después los que no se pudieron ubicar."""
+    """Detail pages not read yet: favourites first, then the listings that could not be located."""
     return con.execute(
         f"SELECT id, url FROM listings WHERE id LIKE '{site}:%' AND detail_at IS NULL AND discarded=0 "
         "ORDER BY favorite DESC, (lat IS NULL) DESC, "
@@ -103,7 +103,7 @@ def pending_geocode(con, site):
 
 
 def save_list_position(con, lid, lat, lng, station, station_m):
-    """Coordenadas exactas que ya vienen en el listado (Zonaprop)."""
+    """Exact coordinates that come with the result list (Zonaprop)."""
     con.execute("UPDATE listings SET lat=?, lng=?, geo_src='lista', geo_tried=1, station=?, "
                 "station_line=?, station_m=? WHERE id=?",
                 (lat, lng, station["name"], station["line"], round(station_m), lid))

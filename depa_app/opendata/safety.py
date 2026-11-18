@@ -1,10 +1,10 @@
-"""Capas de seguridad para el mapa (solo se dibujan, no entran en el puntaje).
+"""Safety layers for the map (drawn only; they are not part of the score).
 
-- CABA: mapa de calor de delitos violentos del Mapa del Delito (BA Data, Ministerio de Seguridad
-  de la Ciudad): https://data.buenosaires.gob.ar/dataset/delitos. Los CSV por año se bajan a mano
-  con el navegador (el portal rechaza descargas que no son de un navegador) a data/delitos/.
-- GBA Norte: barrios populares del RENABAP (Registro Nacional de Barrios Populares), polígonos
-  oficiales de datos.gob.ar. No mide delitos: son villas y asentamientos (vivienda, servicios).
+- CABA: heat map of violent crime from the city's Mapa del Delito (BA Data):
+  https://data.buenosaires.gob.ar/dataset/delitos. The yearly CSVs are downloaded by hand with a
+  browser into data/delitos/.
+- GBA Norte: RENABAP informal settlements (official polygons from datos.gob.ar). This measures
+  housing conditions, not crime.
 """
 import csv
 import json
@@ -12,18 +12,18 @@ from collections import Counter
 
 import requests
 
-from .config import DATA
-from .zones import ZONES
+from ..config import DATA
+from ..domain.zones import ZONES
 
 DELITOS_DIR = DATA / "delitos"
 CALOR_PATH = DATA / "delitos_calor.json"
 BARRIOS_PATH = DATA / "barrios_populares.json"
 RENABAP_URL = "https://archivo.infraestructura.gob.ar/dataset/ssisu/20231205_info_publica.geojson"
 
-# delitos que cuentan para el calor: con violencia contra la persona (hurtos, viales y amenazas no)
+# crimes that count for the heat map: violence against a person (no thefts, traffic or threats)
 TIPOS_VIOLENTOS = {"Robo", "Homicidios", "Lesiones"}
-CELDA = 0.001  # grados (~110 x 90 m): se suman los hechos por celda para que el mapa no pese
-# el registro llama "General San Martín" al partido que en zones.py es "San Martín"
+CELDA = 0.001  # degrees (~110 x 90 m): incidents are summed per cell so the map stays light
+# the registry calls "General San Martín" the partido that zones.py calls "San Martín"
 _PARTIDO = {"San Martín": "General San Martín"}
 
 
@@ -32,7 +32,7 @@ def _csv_files():
 
 
 def build_heat():
-    """Suma los delitos violentos de todos los CSV de data/delitos/ en celdas -> delitos_calor.json."""
+    """Sums the violent crimes of every CSV in data/delitos/ into cells -> delitos_calor.json."""
     cells, years, n = Counter(), set(), 0
     for path in _csv_files():
         with open(path, encoding="utf-8-sig", newline="") as f:
@@ -44,7 +44,7 @@ def build_heat():
                     cant = int(float(r.get("cantidad") or 1))
                 except (KeyError, TypeError, ValueError):
                     continue
-                if not (-34.75 < lat < -34.5 and -58.55 < lng < -58.33):  # fuera de CABA / sin dato
+                if not (-34.75 < lat < -34.5 and -58.55 < lng < -58.33):  # outside CABA / no data
                     continue
                 cells[(round(lat / CELDA), round(lng / CELDA))] += cant
                 years.add(r.get("anio", ""))
@@ -57,7 +57,7 @@ def build_heat():
 
 
 def load_heat():
-    """Celdas del mapa de calor; se rehace si cambiaron los CSV. Vacío si no hay CSV."""
+    """Heat-map cells; rebuilt when the CSVs changed. Empty when there are no CSVs."""
     files = {p.name: p.stat().st_mtime for p in _csv_files()}
     if not files:
         return {"cells": [], "years": [], "hechos": 0}
@@ -77,8 +77,8 @@ def _round(coords):
 
 
 def build_barrios(geojson=None):
-    """Barrios populares de los partidos de GBA Norte -> barrios_populares.json.
-    `geojson`: archivo ya bajado; si no, se baja del registro oficial (~9 MB)."""
+    """Informal settlements in the GBA Norte partidos -> barrios_populares.json.
+    `geojson`: an already downloaded file; otherwise it is downloaded from the official registry (~9 MB)."""
     if geojson:
         src = json.loads(open(geojson, encoding="utf-8").read())
     else:

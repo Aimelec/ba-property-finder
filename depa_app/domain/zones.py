@@ -1,7 +1,7 @@
-"""Zonas de búsqueda y cómo se llaman en cada sitio.
+"""Search zones and how each site names them.
 
-clave (= slug de Argenprop, se guarda en la base) -> nombre, slug Zonaprop, ruta MercadoLibre.
-Se pueden agregar zonas solo-Argenprop desde la pestaña Buscar (pegando la URL).
+key (= the Argenprop slug, stored in the database) -> name, Zonaprop slug, MercadoLibre path.
+Argenprop-only zones can be added from the Search page (by pasting a URL).
 """
 
 
@@ -60,7 +60,7 @@ _BY_KEY = {z[0]: (z, g) for g, items in ZONES.items() for z in items}
 
 
 def zone_info(key):
-    """(nombre, grupo); las zonas agregadas a mano quedan en 'Otra'."""
+    """(name, group); zones added by hand go to 'Otra' (other)."""
     if key in _BY_KEY:
         z, g = _BY_KEY[key]
         return z[1], g
@@ -68,7 +68,7 @@ def zone_info(key):
 
 
 def site_slug(key, site):
-    """Slug de la zona en un sitio ('ap', 'zp', 'ml'); None si el sitio no la tiene."""
+    """Slug of the zone on a site ('ap', 'zp', 'ml'); None when the site does not have it."""
     if site == "ap":
         return key
     if key not in _BY_KEY:

@@ -5,7 +5,7 @@ from qfluentwidgets import (BodyLabel, FluentIcon as FIF, InfoBar, InfoBarPositi
                             SimpleCardWidget, Slider, SmoothScrollArea, SpinBox, StrongBodyLabel,
                             TitleLabel)
 
-from .. import stations
+from ..opendata import stations
 from ..config import save_settings
 from .common import dim_label
 
@@ -148,7 +148,7 @@ class PrefsPage(SmoothScrollArea):
         st = self.state
         st.stations = res
         st.station_pos = {(x["name"], x["line"]): x for x in res}
-        from .. import db
+        from ..repositories import listings_db as db
         con = db.connect()
         con.execute("UPDATE listings SET station=NULL, station_line=NULL, station_m=NULL")
         con.commit()

@@ -9,7 +9,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from qfluentwidgets import TitleLabel
 
-from .. import seguridad, stations
+from ..opendata import safety as seguridad, stations
 from ..domain import geo
 from .common import BG, dim_label, meters, miles, score_color
 from .filters import FilterPanel

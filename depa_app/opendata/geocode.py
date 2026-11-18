@@ -1,8 +1,8 @@
-"""Ubicación aproximada desde la dirección del aviso, sin pedirle nada a Argenprop.
+"""Approximate location from a listing's address.
 
-1) API Georef (datos.gob.ar, gratuita, del Estado): calle + altura + partido.
-2) Si no encuentra: Nominatim (OpenStreetMap), máximo 1 pedido por segundo.
-Los resultados (también los fallidos) se guardan en data/geocache.json.
+1) Georef API (datos.gob.ar, free, from the Argentine government): street + number + partido.
+2) If not found: Nominatim (OpenStreetMap), at most 1 request per second.
+Results (failures too) are cached in data/geocache.json.
 """
 import json
 import re
@@ -11,14 +11,14 @@ import time
 
 import requests
 
-from .config import DATA
+from ..config import DATA
 
 CACHE_PATH = DATA / "geocache.json"
 UA = {"User-Agent": "depa-personal/0.1 (uso personal)"}
 _lock = threading.Lock()
 _cache = None
 _last_nominatim = 0.0
-_nom_lock = threading.Lock()  # varios sitios descargan a la vez: máximo 1 pedido/s en total
+_nom_lock = threading.Lock()  # several sources run at once: at most 1 request/s in total
 
 ABBREV = [
     (r"\bav(?:da)?\.?\s+", "Avenida "), (r"\bpres\.?\s+", "Presidente "), (r"\bpte\.?\s+", "Presidente "),
@@ -94,7 +94,7 @@ def _nominatim(street, number, partido, provincia):
 
 
 def geocode(address, zona, grupo):
-    """(lat, lng) o None. zona = nombre del partido/barrio, grupo = CABA/GBA…"""
+    """(lat, lng) or None. zona = partido/barrio name, grupo = CABA/GBA..."""
     street, number = clean_street(address or "")
     if not street or not number:
         return None
@@ -110,7 +110,7 @@ def geocode(address, zona, grupo):
     try:
         res = _georef(street, number, partido, provincia) or _nominatim(street, number, partido, provincia)
     except (requests.RequestException, ValueError, KeyError):
-        return None  # sin guardar: se reintenta la próxima vez
+        return None  # not cached: retried next time
     with _lock:
         _cache[key] = list(res) if res else None
         _save()

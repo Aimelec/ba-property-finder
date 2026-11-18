@@ -5,7 +5,7 @@ from qfluentwidgets import (BodyLabel, CheckBox, SearchLineEdit, SpinBox, Strong
                             SmoothScrollArea)
 
 from ..config import save_settings
-from ..zones import GROUPS
+from ..domain.zones import GROUPS
 
 TIPOS = ["Departamento", "Casa", "PH"]
 SITIOS = [("ap", "Argenprop"), ("zp", "Zonaprop"), ("ml", "MercadoLibre"), ("tk", "Inmobiliarias")]
