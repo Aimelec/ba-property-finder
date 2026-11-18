@@ -1,0 +1,24 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Personal data: scraped listings, settings, favourites, logs, caches, browser profile, downloads
+data/
+
+# Optional private plugins kept on this PC only (see depa_app/plugins.py)
+depa_private/
+herramientas/
+
+# Tests that run on the real (scraped) data: local only
+tests_private/
+
+# Local notes for the AI assistant
+CLAUDE.md
+.claude/
+
+# Editors / OS
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini
