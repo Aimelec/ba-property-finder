@@ -70,7 +70,7 @@ def download():
             stations.append({"name": t["name"], "line": ref[:1] if ref[:1] in COLORS else ref,
                              "lat": e["lat"], "lng": e["lon"]})
     # OSM no siempre dice de qué línea es cada estación: la más cercana a su recorrido
-    from .stations import haversine
+    from .domain.geo import haversine
     for st in stations:
         if st["line"] in COLORS:
             continue

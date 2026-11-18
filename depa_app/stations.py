@@ -1,6 +1,5 @@
 """Estaciones de tren del AMBA (OpenStreetMap) y distancia a la más cercana."""
 import json
-import math
 
 import requests
 
@@ -60,26 +59,3 @@ def load():
     if STATIONS_PATH.exists():
         return frequent(json.loads(STATIONS_PATH.read_text(encoding="utf-8")))
     return download()
-
-
-def haversine(lat1, lng1, lat2, lng2):
-    r = 6371000.0
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    a = (math.sin((p2 - p1) / 2) ** 2
-         + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lng2 - lng1) / 2) ** 2)
-    return 2 * r * math.asin(math.sqrt(a))
-
-
-def nearest(stations, lat, lng):
-    """(estación, metros en línea recta)."""
-    best, best_d = None, float("inf")
-    for st in stations:
-        d = haversine(lat, lng, st["lat"], st["lng"])
-        if d < best_d:
-            best, best_d = st, d
-    return best, best_d
-
-
-def walk_minutes(meters):
-    """Estimación: las calles alargan ~30 % la línea recta, 80 m/min caminando."""
-    return round(meters * 1.3 / 80)

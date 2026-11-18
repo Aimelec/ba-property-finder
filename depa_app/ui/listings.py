@@ -8,7 +8,7 @@ from qfluentwidgets import (BodyLabel, CaptionLabel, FluentIcon as FIF, ImageLab
                             StrongBodyLabel, SubtitleLabel, TableView, TitleLabel,
                             TogglePushButton)
 
-from .. import stations
+from ..domain import geo
 from .common import ACCENT, TEXT_DIM, dim_label, fade_in, meters, miles, score_color, usd
 from .filters import FilterPanel
 
@@ -215,10 +215,10 @@ class DetailPanel(SmoothScrollArea):
             line = f" ({r['station_line']})" if r["station_line"] else ""
             approx = " (ubicación aproximada por dirección)" if r.get("geo_src") == "direccion" else ""
             self.station.setText(f"Estación {r['station']}{line}: {meters(r['station_m'])} en línea recta, "
-                                 f"~{stations.walk_minutes(r['station_m'])} min caminando{approx}")
+                                 f"~{geo.walk_minutes(r['station_m'])} min caminando{approx}")
             if r.get("subte_m") is not None and r["subte_m"] <= 2000:
                 self.station.setText(self.station.text() + f"\nSubte {r['subte_line']} {r['subte']}: "
-                                     f"{meters(r['subte_m'])} (~{stations.walk_minutes(r['subte_m'])} min)")
+                                     f"{meters(r['subte_m'])} (~{geo.walk_minutes(r['subte_m'])} min)")
         else:
             self.station.setText("Estación: sin ubicación (no se encontró la dirección; se completa al leer la ficha).")
         self.fav.setChecked(bool(r.get("favorite")))

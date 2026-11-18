@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from qfluentwidgets import (BodyLabel, CaptionLabel, CardWidget, FlowLayout, SmoothScrollArea,
                             StrongBodyLabel, SubtitleLabel, TitleLabel)
 
-from .. import stations
+from ..domain import geo
 from .common import ACCENT, StatCard, TEXT_DIM, dim_label, fade_in, meters, score_color, usd
 
 
@@ -37,7 +37,7 @@ class ListingCard(CardWidget):
             bits.append(f"{m2:.0f} m²")
         if r["station_m"] is not None:
             bits.append(f"estación {r['station']} {meters(r['station_m'])} "
-                        f"(~{stations.walk_minutes(r['station_m'])} min)")
+                        f"(~{geo.walk_minutes(r['station_m'])} min)")
         cap = CaptionLabel(" · ".join(bits), self)
         cap.setTextColor(QColor(TEXT_DIM), QColor(TEXT_DIM))
         mid.addWidget(cap)

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 from qfluentwidgets import TitleLabel
 
 from .. import seguridad, stations
+from ..domain import geo
 from .common import BG, dim_label, meters, miles, score_color
 from .filters import FilterPanel
 
@@ -199,10 +200,10 @@ class MapPage(QWidget):
         st = ""
         if r["station_m"] is not None:
             st = (f"Estación {esc(r['station'])} · {meters(r['station_m'])} · "
-                  f"~{stations.walk_minutes(r['station_m'])} min")
+                  f"~{geo.walk_minutes(r['station_m'])} min")
         if r.get("subte_m") is not None and r["subte_m"] <= 1500:
             st += (f"<br>Subte {esc(r['subte_line'])} {esc(r['subte'])} · {meters(r['subte_m'])} · "
-                   f"~{stations.walk_minutes(r['subte_m'])} min")
+                   f"~{geo.walk_minutes(r['subte_m'])} min")
         price = f"USD {miles(r['price_usd'])}" if r["price_usd"] else miles(r["price_ars"], "$ ")
         color = score_color(r["score"]).name()
         return (f'<div class="pp">{img}<span class="sc" style="color:{color}">{r["score"]}</span>'

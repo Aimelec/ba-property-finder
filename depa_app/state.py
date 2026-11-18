@@ -5,7 +5,8 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 import unicodedata
 
-from . import argenprop, db, geocode, mercadolibre, plugins, scoring, stations, subte, tokko, zonaprop
+from . import argenprop, db, geocode, mercadolibre, plugins, stations, subte, tokko, zonaprop
+from .domain import filters, geo, scoring
 from .fetch import Blocked, Client, Stopped
 from .zones import site_slug, zone_info
 
@@ -47,7 +48,7 @@ class AppState(QObject):
         for r in rows:  # avisos con coordenadas sin estación, o con una que ya no cuenta (ramal lento)
             if r["lat"] is not None and (r["station_m"] is None
                                          or (r["station"], r["station_line"]) not in self.station_pos):
-                st, d = stations.nearest(self.stations, r["lat"], r["lng"])
+                st, d = geo.nearest(self.stations, r["lat"], r["lng"])
                 con.execute("UPDATE listings SET station=?, station_line=?, station_m=? WHERE id=?",
                             (st["name"], st["line"], round(d), r["id"]))
                 r.update(station=st["name"], station_line=st["line"], station_m=round(d))
@@ -62,7 +63,7 @@ class AppState(QObject):
         sub = self.subte.get("stations", [])
         for r in self.rows:
             if r["lat"] is not None and sub and "subte_m" not in r:
-                st, d = stations.nearest(sub, r["lat"], r["lng"])
+                st, d = geo.nearest(sub, r["lat"], r["lng"])
                 r["subte"], r["subte_line"], r["subte_m"] = st["name"], st["line"], round(d)
         scoring.score_all(self.rows, self.settings)
         self.rows.sort(key=lambda r: -r["score"])
@@ -74,7 +75,7 @@ class AppState(QObject):
         t = self.text.lower().strip()
         out = []
         for r in self.rows:
-            if not scoring.passes(r, f):
+            if not filters.passes(r, f):
                 continue
             if t and t not in " ".join(str(r.get(k) or "") for k in
                                        ("title", "address", "zona", "station", "agent")).lower():
@@ -110,7 +111,7 @@ def zones_by_distance(keys, start):
     if start not in center:
         return sorted(keys, key=lambda k: k != start)
     c0 = center[start]
-    return sorted(keys, key=lambda k: (k not in center, stations.haversine(*c0, *center[k]) if k in center else 0,
+    return sorted(keys, key=lambda k: (k not in center, geo.haversine(*c0, *center[k]) if k in center else 0,
                                        keys.index(k)))
 
 
@@ -299,7 +300,7 @@ class ScrapeWorker(QThread):
                 stats["bajas"] += 1
                 self._log(f"Bajó de precio: {it['address']} → USD {p:,.0f}")
             if it.get("lat") is not None:
-                station, dist = stations.nearest(self.sts, it["lat"], it["lng"])
+                station, dist = geo.nearest(self.sts, it["lat"], it["lng"])
                 db.save_list_position(con, it["id"], it["lat"], it["lng"], station, dist)
             elif st == "nuevo":
                 to_locate.append(it)
@@ -309,7 +310,7 @@ class ScrapeWorker(QThread):
         for it, pos in zip(to_locate, positions):
             st = dist = None
             if pos:
-                st, dist = stations.nearest(self.sts, *pos)
+                st, dist = geo.nearest(self.sts, *pos)
                 stats["ubicados"] += 1
             db.save_geocode(con, it["id"], pos, st, dist)
         if self._stop:
@@ -320,7 +321,7 @@ class ScrapeWorker(QThread):
         pos = geocode.geocode(address, zona, grupo)
         st = dist = None
         if pos:
-            st, dist = stations.nearest(self.sts, *pos)
+            st, dist = geo.nearest(self.sts, *pos)
             stats["ubicados"] += 1
         db.save_geocode(con, lid, pos, st, dist)
 
@@ -354,7 +355,7 @@ class ScrapeWorker(QThread):
             d = self.src.parse_detail(html)
             st = dist = None
             if d.get("lat") is not None:
-                st, dist = stations.nearest(self.sts, d["lat"], d["lng"])
+                st, dist = geo.nearest(self.sts, d["lat"], d["lng"])
             db.save_detail(con, row["id"], d, st, dist)
             con.commit()
             stats["fichas"] += 1
