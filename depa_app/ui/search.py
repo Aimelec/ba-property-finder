@@ -11,7 +11,8 @@ from qfluentwidgets import (BodyLabel, CaptionLabel, CheckBox, FluentIcon as FIF
 from ..config import DATA, save_settings
 from .. import plugins
 from ..sources import tokko
-from ..state import SITE_NAMES, SOURCES, ScrapeWorker
+from ..sources import SITE_NAMES, SOURCES
+from .workers import ScrapeWorker
 from ..domain.zones import DEFAULT_SELECTED, ZONES, zone_info
 from .common import dim_label
 

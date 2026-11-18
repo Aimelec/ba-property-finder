@@ -9,7 +9,7 @@ from qfluentwidgets import (FluentIcon as FIF, FluentWindow, NavigationItemPosit
                             setTheme, setThemeColor)
 
 from depa_app.config import load_settings
-from depa_app.state import AppState
+from depa_app.ui.app_state import AppState
 from depa_app.ui.common import ACCENT, BG, GLOBAL_QSS
 from depa_app.ui.home import HomePage
 from depa_app.ui.listings import ListingsPage
