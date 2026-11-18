@@ -29,7 +29,7 @@ class Catalog:
     def reload(self):
         self.loaded_mtime = self.db_mtime()
         con = db.connect()
-        rows = db.all_listings(con)
+        rows = geo.clear_outside_area(db.all_listings(con))  # wrong pins / geocoding matches
         changed = False
         for r in rows:  # located listings without a station, or with one that no longer counts (slow branch)
             if r["lat"] is not None and (r["station_m"] is None

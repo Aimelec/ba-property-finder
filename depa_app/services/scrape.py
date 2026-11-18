@@ -220,14 +220,14 @@ class ScrapeRun:
             elif st == "baja":
                 stats["bajas"] += 1
                 self._log(tr("Price dropped: {address} → USD {price}", address=it["address"], price=number(p)))
-            if it.get("lat") is not None:
+            if it.get("lat") is not None and geo.in_area(it["lat"], it["lng"]):
                 station, dist = geo.nearest(self.sts, it["lat"], it["lng"])
                 db.save_list_position(con, it["id"], it["lat"], it["lng"], station, dist)
             elif st == "nuevo":
                 to_locate.append(it)
         con.commit()  # don't keep the database locked while locating (other sources write)
         # locate this page's new listings by address, 6 at a time (Georef, not the site)
-        positions = list(_POOL.map(lambda it: geocode.geocode(it["address"], name, group), to_locate))
+        positions = list(_POOL.map(lambda it: self._geocode(it["address"], name, group), to_locate))
         for it, pos in zip(to_locate, positions):
             st = dist = None
             if pos:
@@ -238,8 +238,14 @@ class ScrapeRun:
             raise Stopped()
 
     # --- locating ---
-    def _geocode_one(self, con, lid, address, zona, grupo, stats):
+    @staticmethod
+    def _geocode(address, zona, grupo):
+        """Position from the address, or None (also when the match is outside the area)."""
         pos = geocode.geocode(address, zona, grupo)
+        return pos if pos and geo.in_area(*pos) else None
+
+    def _geocode_one(self, con, lid, address, zona, grupo, stats):
+        pos = self._geocode(address, zona, grupo)
         st = dist = None
         if pos:
             st, dist = geo.nearest(self.sts, *pos)
@@ -274,6 +280,8 @@ class ScrapeRun:
                 con.commit()  # don't hold the lock during the next page
                 continue
             d = self.src.parse_detail(html)
+            if d.get("lat") is not None and not geo.in_area(d["lat"], d["lng"]):
+                d.pop("lat"), d.pop("lng")  # a pin outside the area is wrong: keep the listing unlocated
             st = dist = None
             if d.get("lat") is not None:
                 st, dist = geo.nearest(self.sts, d["lat"], d["lng"])

@@ -25,3 +25,21 @@ def nearest(points, lat, lng):
 def walk_minutes(meters):
     """Estimate: streets make the straight line ~30 % longer; walking at 80 m/min."""
     return round(meters * 1.3 / 80)
+
+
+# Greater Buenos Aires (AMBA) with a margin. Positions outside it are wrong pins or wrong geocoding
+# matches (e.g. a listing placed in Venezuela) and count as "not located".
+AREA_LAT = (-35.2, -34.2)
+AREA_LNG = (-59.3, -57.9)
+
+
+def in_area(lat, lng):
+    return AREA_LAT[0] <= lat <= AREA_LAT[1] and AREA_LNG[0] <= lng <= AREA_LNG[1]
+
+
+def clear_outside_area(rows):
+    """Forget (in memory) positions outside the area: the listing shows as not located."""
+    for r in rows:
+        if r.get("lat") is not None and not in_area(r["lat"], r["lng"]):
+            r.update(lat=None, lng=None, station=None, station_line=None, station_m=None)
+    return rows
