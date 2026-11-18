@@ -63,7 +63,8 @@ def mark_duplicates(rows):
         groups.setdefault(find(x), set()).add(x)
     for root, members in groups.items():
         members.add(root)
-        ms = sorted((by_id[m] for m in members), key=data_rank, reverse=True)
+        # most complete first; ties broken by id so the result never depends on set order
+        ms = sorted((by_id[m] for m in members), key=lambda r: (-data_rank(r), r["id"]))
         main = ms[0]
         for o in ms[1:]:
             o["dup_of"] = main["id"]
