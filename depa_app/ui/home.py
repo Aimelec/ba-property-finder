@@ -62,8 +62,8 @@ class HomePage(SmoothScrollArea):
         self.lay.setSpacing(12)
         self.lay.addWidget(TitleLabel("depa", body))
         self.lay.addWidget(dim_label(
-            "Avisos de venta de Argenprop con puntaje según tus preferencias. Lo más importante "
-            "por defecto: cercanía a una estación de tren y zona norte.", body))
+            "Avisos de venta de portales e inmobiliarias con puntaje según tus preferencias. Lo más "
+            "importante por defecto: cercanía a una estación de tren y zona norte.", body))
 
         stats_w = QWidget(body)
         self.flow = FlowLayout(stats_w, needAni=True)

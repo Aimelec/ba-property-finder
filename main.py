@@ -1,4 +1,4 @@
-"""depa: buscador de propiedades en venta (Argenprop) con puntaje y mapa."""
+"""depa: buscador de propiedades en venta (portales e inmobiliarias) con puntaje y mapa."""
 import sys
 
 from PySide6.QtCore import Qt, QTimer
