@@ -1,9 +1,8 @@
-"""Webs propias de inmobiliarias hechas con Tokko Broker (plantilla clásica).
+"""Agency websites built with Tokko Broker (classic template).
 
-Cada web lista sus avisos de venta en /Venta (20 por página) y las siguientes con
-/Venta?o=2,2&p=N hasta "--NoMoreProperties--". Revisado 2026-10-18: sin límites de
-pedidos. No hay coordenadas en el listado: se ubica por dirección (Georef).
-La lista de inmobiliarias está en ajustes ("inmobiliarias") y se edita en Buscar.
+Each site lists its listings for sale at /Venta (20 per page) and the next pages at
+/Venta?o=2,2&p=N until "--NoMoreProperties--". There are no coordinates in the list: listings are
+located by address. The agency list is in the settings ("inmobiliarias") and editable in Search.
 """
 import re
 import unicodedata
@@ -11,7 +10,6 @@ from urllib.parse import urlparse
 
 from selectolax.lexbor import LexborHTMLParser
 
-from .fetch import Client  # noqa: F401
 
 SITE = "tk"
 NAME = "Inmobiliarias"
@@ -30,7 +28,7 @@ DEFAULT_AGENCIES = [
 ]
 TIPOS = {"departamento": ("Departamento", "departamentos"), "casa": ("Casa", "casas"), "ph": ("PH", "ph")}
 
-# localidad -> clave de zona (zones.py). Las de cada partido van a su partido.
+# locality -> zone key (zones.py). Localities of a partido go to that partido.
 _PARTIDOS = {
     "partido-de-san-fernando": ["san fernando", "victoria", "virreyes", "punta chica"],
     "partido-de-tigre": ["tigre", "don torcuato", "pacheco", "el talar", "benavidez", "rincon de milberg",
@@ -63,7 +61,7 @@ def zone_of(ubicacion):
             if b in whole:
                 return b.replace(" ", "-")
         return None
-    for part in reversed(parts):  # el partido suele venir al final
+    for part in reversed(parts):  # the partido usually comes last
         for key, locs in _PARTIDOS.items():
             if any(part == l or part.startswith(l + " ") or f" {l}" in f" {part}" for l in locs):
                 return key
@@ -80,7 +78,7 @@ def _num(t):
 
 
 def parse_list(html, base, agency):
-    """(avisos, hay_más). Cada aviso trae 'zona_slug' calculada desde la localidad."""
+    """(listings, more pages). Each listing gets 'zona_slug' from its locality."""
     host = urlparse(base).netloc.replace("www.", "")
     tree = LexborHTMLParser(html)
     items = []
@@ -105,7 +103,7 @@ def parse_list(html, base, agency):
             "address": f"{street}, {loc}",
             "loc": loc,
             "zona_slug": zone_of(loc),
-            "price_usd": price if usd and price and price > 1000 else None,  # "1" = consultar
+            "price_usd": price if usd and price and price > 1000 else None,  # "1" = price on request
             "price_ars": price if m and not usd else None,
             "agent": agency,
         }

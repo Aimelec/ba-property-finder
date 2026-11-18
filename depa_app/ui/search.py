@@ -9,7 +9,8 @@ from qfluentwidgets import (BodyLabel, CaptionLabel, CheckBox, FluentIcon as FIF
                             StrongBodyLabel, TitleLabel)
 
 from ..config import DATA, save_settings
-from .. import plugins, tokko
+from .. import plugins
+from ..sources import tokko
 from ..state import SITE_NAMES, SOURCES, ScrapeWorker
 from ..zones import DEFAULT_SELECTED, ZONES, zone_info
 from .common import dim_label

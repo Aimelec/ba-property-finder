@@ -1,9 +1,10 @@
-"""Cliente de descarga lento y educado, compartido por todos los sitios.
+"""Slow, polite HTTP client shared by all sources.
 
-- pausa aleatoria entre pedidos
-- 'lote': después de N páginas, una pausa larga
-- si el sitio bloquea, espera y reintenta (los tiempos dependen del sitio)
-- puede usar un navegador integrado (plugin opcional, ver plugins.py) o requests
+- random pause between requests ('pause'), optional long pause every N pages ('batch') and a
+  longer rest every N pages ('rest')
+- when a site pushes back, it waits ('block_waits') and retries, then gives up with Blocked
+- every request is logged to data/logs/pedidos.csv (time, host, result, status, seconds, url)
+- pages can come from plain HTTP (requests) or from an alternative fetcher (plugin, see plugins.py)
 """
 import random
 import threading
@@ -13,15 +14,15 @@ from urllib.parse import urlparse
 
 import requests
 
-from .config import DATA
+from ..config import DATA
 
-# registro de cada pedido (para ajustar el ritmo de cada sitio): data/logs/pedidos.csv
+# one line per request, to tune each site's pace: data/logs/pedidos.csv
 REQ_LOG = DATA / "logs" / "pedidos.csv"
 _req_lock = threading.Lock()
 
 
 def log_request(url, result, status, secs, session_n):
-    """result: ok / bloqueado / no_existe. session_n: pedidos de este cliente hasta ahora."""
+    """result: ok / bloqueado (refused) / no_existe (404). session_n: requests made by this client so far."""
     try:
         REQ_LOG.parent.mkdir(exist_ok=True)
         new = not REQ_LOG.exists()
@@ -44,18 +45,18 @@ BLOCK_SIGNS = ("Just a moment", "Un momento", "cf-chl", "captcha", "account-veri
 
 
 class Blocked(Exception):
-    """El sitio sigue bloqueando después de los reintentos."""
+    """The site still refuses after all the retries."""
 
 
 class Stopped(Exception):
-    """El usuario apretó Detener."""
+    """The user pressed Stop."""
 
 
 class Client:
     def __init__(self, pause=(10.0, 15.0), log=print, should_stop=lambda: False, browser=None,
                  batch=None, rest=None, block_waits=(60, 180, 420)):
-        """batch: (páginas, segundos) = pausa larga cada tantas páginas.
-        browser: objeto con fetch(url, should_stop) (ver plugins.py) o None para usar requests."""
+        """pause: (min, max) seconds between requests. batch / rest: (pages, seconds) long pauses.
+        browser: object with fetch(url, should_stop) (see plugins.py), or None to use requests."""
         self.browser = browser
         self.s = requests.Session()
         self.s.headers.update(HEADERS)
@@ -63,7 +64,7 @@ class Client:
         self.log = log
         self.should_stop = should_stop
         self.batch = batch
-        self.rest = rest  # (páginas, segundos): descanso largo cada tantas páginas
+        self.rest = rest  # (pages, seconds): a longer rest every that many pages
         self._total = 0
         self.block_waits = block_waits
         self._last = 0.0
@@ -94,7 +95,7 @@ class Client:
         self._total += 1
 
     def get(self, url):
-        """HTML de la página, o None si no existe (404 / sin contenido)."""
+        """HTML of the page, or None when it does not exist (404 / empty)."""
         waits = self.block_waits
         for attempt in range(len(waits) + 1):
             self._wait_turn()
@@ -108,11 +109,11 @@ class Client:
                 break
             self.log(f"{why}: espero {waits[attempt] // 60} min y reintento…")
             self.sleep(waits[attempt])
-            self._count = 0  # después de esperar, el lote empieza de nuevo
+            self._count = 0  # after waiting, the batch starts over
         raise Blocked(url)
 
     def _fetch(self, url):
-        """(html, bloqueado, motivo)."""
+        """(html, refused, reason)."""
         self._status = ""
         if self.browser is not None:
             html = self.browser.fetch(url, self.should_stop)

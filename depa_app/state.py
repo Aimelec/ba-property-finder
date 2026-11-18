@@ -5,14 +5,13 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 import unicodedata
 
-from . import argenprop, db, geocode, mercadolibre, plugins, stations, subte, tokko, zonaprop
+from . import db, geocode, plugins, stations, subte
 from .domain import filters, geo, scoring
-from .fetch import Blocked, Client, Stopped
+from .sources import SITE_NAMES, SOURCES, tokko  # noqa: F401  (SITE_NAMES is re-exported for the UI)
+from .sources.client import Blocked, Client, Stopped
 from .zones import site_slug, zone_info
 
 _POOL = ThreadPoolExecutor(6)
-SOURCES = {"ap": argenprop, "zp": zonaprop, "ml": mercadolibre, "tk": tokko}
-SITE_NAMES = {k: m.NAME for k, m in SOURCES.items()}
 
 
 class AppState(QObject):

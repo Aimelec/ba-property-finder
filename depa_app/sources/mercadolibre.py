@@ -1,21 +1,20 @@
-"""MercadoLibre Inmuebles: listados de 48 avisos (sin coordenadas; se ubican por dirección).
+"""MercadoLibre Inmuebles: result lists of 48 listings (no coordinates: located by address).
 
-La búsqueda general de "venta" trae también locales, oficinas y cocheras: se
-filtran por tipo. Los emprendimientos (precios "desde") se saltean.
+The general "for sale" search also returns shops, offices and parking spaces: they are filtered out
+by type. Developments ("from" prices) are skipped.
 """
 import json
 import re
 
-from .fetch import Client  # noqa: F401
 
 SITE = "ml"
 NAME = "MercadoLibre"
 PER_PAGE = 48
-# una página cada 3-4 s
+# one page every 3-4 s
 CLIENT_OPTS = {"pause": (3.0, 4.0), "block_waits": (120, 300, 600)}
 
 BASE = "https://inmuebles.mercadolibre.com.ar"
-DOMAINS = {  # domain_id -> (tipo, clave de la búsqueda)
+DOMAINS = {  # domain_id -> (property type, search key)
     "MLA-INDIVIDUAL_APARTMENTS_FOR_SALE": ("Departamento", "departamentos"),
     "MLA-HORIZONTAL_PROPERTY_FOR_SALE": ("PH", "ph"),
     "MLA-INDIVIDUAL_HOUSES_FOR_SALE": ("Casa", "casas"),
@@ -36,7 +35,7 @@ def _attrs(texts, it):
     for t in texts:
         tl = t.lower()
         n = re.search(r"\d+(?:[.,]\d+)?", t)
-        if not n or " a " in tl or " - " in tl:  # rangos de emprendimientos
+        if not n or " a " in tl or " - " in tl:  # price ranges of developments
             continue
         v = float(n.group(0).replace(".", "").replace(",", ".")) if "m²" in t else float(n.group(0).replace(",", "."))
         if "amb" in tl:
@@ -88,4 +87,4 @@ def parse_list(html, tipos=("departamentos", "casas", "ph")):
     m = re.search(r'"event_data":\{[^{]*?"total":(\d+)', html)
     total = int(m.group(1)) if m else len(res)
     pages = -(-total // PER_PAGE) if total else 0
-    return items, min(pages, 42), total  # MercadoLibre no muestra más de ~2000 resultados
+    return items, min(pages, 42), total  # MercadoLibre shows at most ~2000 results

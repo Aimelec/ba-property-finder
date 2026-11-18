@@ -1,23 +1,22 @@
-"""Argenprop: listados (20 avisos por página) y fichas (ubicación exacta y características).
+"""Argenprop: result lists (20 listings per page) and detail pages (exact location, features).
 
-Sus páginas se descargan con un navegador integrado (plugin opcional, ver plugins.py), despacio.
+Its pages are loaded with a built-in browser (optional plugin, see plugins.py), slowly.
 """
 import re
 
 from selectolax.lexbor import LexborHTMLParser
 
-from .fetch import Blocked, Client, Stopped  # noqa: F401  (los usa state.py)
 
 SITE = "ap"
 NAME = "Argenprop"
 PER_PAGE = 20
 NEEDS_BROWSER = True
-# una página cada 15-16 s; si el sitio corta, esperas largas antes de reintentar
+# one page every 15-16 s; long waits before retrying if the site pushes back
 CLIENT_OPTS = {"pause": (15.0, 16.0), "block_waits": (660, 900, 1200)}
 
 BASE = "https://www.argenprop.com"
 
-# ícono de la tarjeta -> campo
+# icon class on the result card -> field
 CARD_ICONS = {
     "superficie_cubierta": "m2_cub",
     "superficie_total": "m2_tot",
@@ -29,7 +28,7 @@ CARD_ICONS = {
 
 
 def number(text):
-    """'USD 99.000' -> 99000.0, '45,5 m²' -> 45.5, 'A estrenar' -> 0."""
+    """'USD 99.000' -> 99000.0, '45,5 m²' -> 45.5, 'A estrenar' (brand new) -> 0."""
     if not text:
         return None
     if "estrenar" in text.lower():
@@ -41,8 +40,8 @@ def number(text):
 
 
 def search_url(tipos, zona, precio_min=0, precio_max=0, page=1):
-    """tipos: ['departamentos','casas','ph'] -> URL de listado de venta."""
-    # Argenprop redirige a su orden (casas, departamentos, ph): pedirlo así evita cargar 2 veces
+    """tipos: ['departamentos', 'casas', 'ph'] -> URL of the for-sale result list."""
+    # Argenprop redirects to its own order (casas, departamentos, ph): asking that way avoids a second load
     url = f"{BASE}/{'-o-'.join(sorted(tipos))}/venta/{zona}"
     if precio_min and precio_max:
         url += f"/dolares-{int(precio_min)}-{int(precio_max)}"
@@ -60,7 +59,7 @@ def _text(node):
 
 
 def parse_list(html):
-    """Devuelve (avisos, total_páginas, total_resultados)."""
+    """(listings, total pages, total results)."""
     tree = LexborHTMLParser(html)
     items = []
     for card in tree.css("div.listing__item a.card"):
@@ -115,7 +114,7 @@ def _tipo(title, href):
 
 
 def parse_detail(html):
-    """Coordenadas y la lista completa de características de la ficha."""
+    """Coordinates and the full feature list of a detail page."""
     tree = LexborHTMLParser(html)
     out = {"features": {}}
     m = tree.css_first("[data-latitude]")

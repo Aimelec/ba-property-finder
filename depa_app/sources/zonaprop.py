@@ -1,24 +1,21 @@
-"""Zonaprop: listados de 30 avisos con todos los datos y coordenadas exactas.
+"""Zonaprop: result lists of 30 listings with all their data and exact coordinates.
 
-Los datos vienen en window.__PRELOADED_STATE__ de cada página de resultados,
-así que no hace falta abrir cada aviso. El sitio muestra como mucho 9 páginas de
-resultados por búsqueda (270 avisos).
+Everything comes in window.__PRELOADED_STATE__ of each result page, so detail pages are not needed.
+The site shows at most 9 result pages per search (270 listings).
 """
 import json
 import re
 
-from .fetch import Client  # noqa: F401
-
 SITE = "zp"
 NAME = "Zonaprop"
 PER_PAGE = 30
-MAX_PAGES = 9  # páginas de resultados que muestra el sitio por búsqueda
+MAX_PAGES = 9  # result pages the site shows per search
 CLIENT_OPTS = {"pause": (5.0, 9.0), "block_waits": (60, 300, 600)}
 
 BASE = "https://www.zonaprop.com.ar"
 TIPO_SLUG = {"casas": "casas", "departamentos": "departamentos", "ph": "ph"}
 TIPO_NAME = {"Departamentos": "Departamento", "Casas": "Casa", "PH": "PH"}
-FEATURES = {  # id de Zonaprop -> campo
+FEATURES = {  # Zonaprop feature id -> field
     "CFT100": "m2_tot", "CFT101": "m2_cub", "CFT1": "amb", "CFT2": "dorm", "CFT3": "banos",
     "CFT5": "antig",
 }
@@ -28,7 +25,7 @@ def search_url(tipos, zona, precio_min=0, precio_max=0, page=1):
     kinds = "-".join(TIPO_SLUG[t] for t in ("casas", "departamentos", "ph") if t in tipos)
     url = f"{BASE}/{kinds}-venta-{zona}"
     if precio_min and precio_max:
-        url += f"-{int(precio_min)}-{int(precio_max)}-dolar"  # rango, ej. -100000-160000-dolar
+        url += f"-{int(precio_min)}-{int(precio_max)}-dolar"  # price range, e.g. -100000-160000-dolar
     elif precio_max:
         url += f"-menos-{int(precio_max)}-dolar"
     if page > 1:
@@ -64,7 +61,7 @@ def _location_names(loc):
 
 
 def parse_list(html):
-    """(avisos, total_páginas, total_resultados)."""
+    """(listings, total pages, total results)."""
     st = _state(html)
     if not st:
         return [], 0, 0
@@ -72,7 +69,7 @@ def parse_list(html):
     items = []
     for p in ls.get("listPostings") or []:
         if p.get("postingType") != "PROPERTY":
-            continue  # emprendimientos (precios "desde")
+            continue  # developments ("from" prices)
         price_usd = price_ars = None
         for op in p.get("priceOperationTypes") or []:
             if (op.get("operationType") or {}).get("name") != "Venta":
